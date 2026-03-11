@@ -13,21 +13,15 @@ def search(query: str):
     url = "https://search.patentsview.org/api/v1/patent"
 
     payload = {
-        "q": {
-            "_text_any": {
-                "patent_title": query
-            }
-        },
-        "f": [
-            "patent_title",
-            "patent_abstract",
-            "patent_id"
-        ],
-        "o": {
-            "per_page": 10
-        }
-    }
-
+    "q": {
+        "_or": [
+            {"_text_any": {"patent_title": query}},
+            {"_text_any": {"patent_abstract": query}}
+        ]
+    },
+    "f": ["patent_title", "patent_abstract", "patent_id"],
+    "o": {"per_page": 10}
+}
     try:
         r = requests.post(url, json=payload)
         data = r.json()

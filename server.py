@@ -5,29 +5,40 @@ app = FastAPI()
 
 @app.get("/")
 def home():
-    return {"message": "Patent search API running"}
+    return {"message": "Patent Search API running"}
 
 @app.get("/search")
 def search(query: str):
 
-    url = "https://developer.uspto.gov/ibd-api/v1/application/grants"
+    url = "https://search.patentsview.org/api/v1/patent"
 
-    params = {
-        "searchText": query,
-        "rows": 10
+    payload = {
+        "q": {
+            "_text_any": {
+                "patent_title": query
+            }
+        },
+        "f": [
+            "patent_title",
+            "patent_abstract",
+            "patent_id"
+        ],
+        "o": {
+            "per_page": 10
+        }
     }
 
     try:
-        r = requests.get(url, params=params)
+        r = requests.post(url, json=payload)
         data = r.json()
 
         results = []
 
-        for item in data.get("results", []):
+        for p in data.get("patents", []):
             results.append({
-                "title": item.get("inventionTitle"),
-                "patent_number": item.get("patentNumber"),
-                "abstract": item.get("abstractText")
+                "title": p.get("patent_title"),
+                "number": p.get("patent_id"),
+                "abstract": p.get("patent_abstract")
             })
 
         return {"results": results}

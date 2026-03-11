@@ -10,8 +10,13 @@ def home():
 @app.get("/search")
 def search(query: str):
     try:
-        url = f"https://api.patentsview.org/patents/query?q={{\"_text_any\":{{\"patent_title\":\"{query}\"}}}}"
-        response = requests.get(url, timeout=10)
+        url = "https://api.patentsview.org/patents/query"
+        params = {
+            "q": f'{{"_text_any":{{"patent_title":"{query}"}}}}',
+            "f": '["patent_title","patent_number","patent_abstract"]'
+        }
+
+        response = requests.get(url, params=params, timeout=10)
         response.raise_for_status()
         data = response.json()
 

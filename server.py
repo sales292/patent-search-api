@@ -1,41 +1,45 @@
 from fastapi import FastAPI
 import requests
+
 app = FastAPI()
 
 @app.get("/")
 def home():
-    return {"message": "USPTO Patent Search API running"}
+    return {"message": "PatentHound API running"}
 
 @app.get("/search")
-def search(keyword: str):
-    """
-    Search U.S. patents using USPTO Open Data API.
-    Returns JSON with title, patent number, abstract.
-    """
+def search(query: str):
 
-    # USPTO Open Data endpoint for granted patents
-    url = "https://developer.uspto.gov/ibd-api/v1/application/publications"
+    url = "https://api.lens.org/patent/search"
 
-    params = {
-        "searchText": keyword,
-        "rows": 10,          # number of results
-        "start": 0           # pagination start
+    payload = {
+        "query": {
+            "match": {
+                "title": query
+            }
+        },
+        "size": 10
+    }
+
+    headers = {
+        "Content-Type": "application/json"
     }
 
     try:
-        response = requests.get(url, params=params, timeout=10)
-        response.raise_for_status()
-        data = response.json()
+        r = requests.post(url, json=payload, headers=headers)
+        data = r.json()
 
         results = []
-        for item in data.get("results", []):
+
+        for item in data.get("data", []):
+
             results.append({
-                "title": item.get("inventionTitle"),
-                "number": item.get("patentNumber"),
-                "abstract": item.get("abstractText")
+                "title": item.get("title"),
+                "number": item.get("lens_id"),
+                "abstract": item.get("abstract")
             })
 
         return {"results": results}
 
     except Exception as e:
-        return {"error": True, "message": str(e)}
+        return {"error": str(e)}

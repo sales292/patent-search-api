@@ -1,45 +1,34 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 import requests
 
 app = FastAPI()
 
-@app.get("/")
-def home():
-    return {"message": "PatentHound API running"}
+@app.get("/analyze")
+def analyze_idea(query: str):
+    # 1️⃣ Search Lens API (or US API)
+    lens_url = "https://api.lens.org/patents/search"
+    headers = {"Authorization": "Bearer YOUR_LENS_KEY"}  # optional for now
+    params = {"q": query, "limit":5}
+    
+    # 2️⃣ Call API
+    response = requests.get(lens_url, params=params)
+    patents = response.json().get("results", [])
 
-@app.get("/search")
-def search(query: str):
+    # 3️⃣ Calculate similarity (simple example using keyword matching)
+    results = []
+    for p in patents:
+        title = p.get("title", "")
+        abstract = p.get("abstract", "")
+        # naive similarity: count overlapping words
+        common_words = set(query.lower().split()) & set((title+abstract).lower().split())
+        score = min(len(common_words)*20, 100)  # max 100%
+        results.append({
+            "title": title,
+            "patent_number": p.get("publication_number"),
+            "abstract": abstract,
+            "similarity": score,
+            "url": p.get("url")
+        })
 
-    url = "https://api.lens.org/patent/search"
-
-    payload = {
-        "query": {
-            "match": {
-                "title": query
-            }
-        },
-        "size": 10
-    }
-
-    headers = {
-        "Content-Type": "application/json"
-    }
-
-    try:
-        r = requests.post(url, json=payload, headers=headers)
-        data = r.json()
-
-        results = []
-
-        for item in data.get("data", []):
-
-            results.append({
-                "title": item.get("title"),
-                "number": item.get("lens_id"),
-                "abstract": item.get("abstract")
-            })
-
-        return {"results": results}
-
-    except Exception as e:
-        return {"error": str(e)}
+    # 4️⃣ Return JSON
+    return {"results": results}

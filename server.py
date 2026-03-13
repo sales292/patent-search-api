@@ -4,7 +4,6 @@ import random
 
 app = FastAPI()
 
-# Allow your website to call the API
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -20,27 +19,19 @@ def home():
 @app.get("/analyze")
 def analyze(query: str):
 
-    # Create dynamic results based on the search keyword
     results = [
         {
             "title": f"{query.title()} Mechanical System",
             "patent_number": f"US{random.randint(1000000,9999999)}A",
-            "abstract": f"A system relating to {query} technology and mechanical design.",
+            "abstract": f"A system relating to {query} technology.",
             "similarity": random.randint(20,80),
             "url": f"https://patents.google.com/?q={query}"
         },
         {
             "title": f"Improved {query.title()} Device",
             "patent_number": f"US{random.randint(1000000,9999999)}B",
-            "abstract": f"A device designed to improve the efficiency of {query}.",
+            "abstract": f"A device designed to improve {query}.",
             "similarity": random.randint(10,60),
-            "url": f"https://patents.google.com/?q={query}"
-        },
-        {
-            "title": f"{query.title()} Control Mechanism",
-            "patent_number": f"US{random.randint(1000000,9999999)}C",
-            "abstract": f"A control mechanism related to {query} functionality.",
-            "similarity": random.randint(5,50),
             "url": f"https://patents.google.com/?q={query}"
         }
     ]

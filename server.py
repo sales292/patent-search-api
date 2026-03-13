@@ -1,64 +1,34 @@
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
+import random
 
 app = FastAPI()
 
-# Allow your WordPress site to access the API
+# Allow your WordPress site to call the API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # or restrict to your domain later
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-@app.get("/")
-def home():
-    return {"message": "PatentHound API running"}
-
 @app.get("/analyze")
-def analyze(query: str = Query(..., description="Idea to check against patents")):
+def analyze_idea(query: str = Query(..., description="Keyword or idea to analyze")):
+    """
+    Mock analyze endpoint that dynamically returns patent-like results based on the query.
+    """
 
-    # Example patent data (mock for testing)
-    patents = [
-        {
-            "title": "Self adjusting bicycle brake",
-            "number": "US1234567A",
-            "abstract": "Brake mechanism that automatically adjusts tension."
-        },
-        {
-            "title": "Automatic bicycle braking system",
-            "number": "US7654321B",
-            "abstract": "System that activates bicycle brakes automatically."
-        },
-        {
-            "title": "Hydraulic brake actuator",
-            "number": "US9988776C",
-            "abstract": "Hydraulic actuator controlling braking pressure."
-        }
-    ]
-
+    # Simulate 3 patents with varying similarity
     results = []
-
-    for patent in patents:
-        title = patent["title"]
-        abstract = patent["abstract"]
-        number = patent["number"]
-
-        # Similarity score (simple keyword overlap)
-        query_words = set(query.lower().split())
-        patent_words = set((title + " " + abstract).lower().split())
-        similarity = min(len(query_words & patent_words) * 25, 100)
-
-        # Google Patents URL (always works)
-        url = f"https://patents.google.com/patent/{number}"
-
+    for i in range(1, 4):
+        similarity = random.randint(0, 100)
         results.append({
-            "title": title,
-            "patent_number": number,
-            "abstract": abstract,
+            "title": f"{query.title()} Patent Example {i}",
+            "patent_number": f"US{random.randint(1000000, 9999999)}A",
+            "abstract": f"This is a mock abstract describing {query} invention example {i}.",
             "similarity": similarity,
-            "url": url
+            "url": f"https://patents.google.com/patent/US{random.randint(1000000,9999999)}A"
         })
 
     return {"results": results}

@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 import io
 from reportlab.pdfgen import canvas
@@ -6,8 +7,21 @@ from reportlab.lib.pagesizes import letter
 
 app = FastAPI()
 
+# ------------------ Enable CORS ------------------
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Replace "*" with your domain for production, e.g., ["https://patenthound.co.uk"]
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ------------------ Mock Analyze Endpoint ------------------
 @app.get("/analyze")
 def analyze_idea(query: str):
+    """
+    Returns mock patent results for any input query.
+    """
     results = [
         {
             "title": f"{query.title()} Self-Adjusting Device",
@@ -33,8 +47,12 @@ def analyze_idea(query: str):
     ]
     return {"results": results}
 
+# ------------------ PDF Download Endpoint ------------------
 @app.get("/download")
 def download_report(query: str):
+    """
+    Generates a PDF report from the same mock data.
+    """
     results = [
         {
             "title": f"{query.title()} Self-Adjusting Device",

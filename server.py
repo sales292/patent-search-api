@@ -1,4 +1,4 @@
- from fastapi import FastAPI
+from fastapi import FastAPI
 from fastapi.responses import FileResponse
 import io
 from reportlab.pdfgen import canvas
@@ -6,14 +6,8 @@ from reportlab.lib.pagesizes import letter
 
 app = FastAPI()
 
-# ---------- MOCK ANALYZE ENDPOINT ----------
 @app.get("/analyze")
 def analyze_idea(query: str):
-    """
-    Returns mock patent results for any input query.
-    Front-end will display these instead of calling an external API.
-    """
-    # Simple mock data
     results = [
         {
             "title": f"{query.title()} Self-Adjusting Device",
@@ -39,12 +33,8 @@ def analyze_idea(query: str):
     ]
     return {"results": results}
 
-# ---------- PDF DOWNLOAD ENDPOINT ----------
 @app.get("/download")
 def download_report(query: str):
-    """
-    Generates a PDF report from the same mock data.
-    """
     results = [
         {
             "title": f"{query.title()} Self-Adjusting Device",
@@ -69,7 +59,6 @@ def download_report(query: str):
         }
     ]
 
-    # Create PDF in memory
     buffer = io.BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=letter)
     width, height = letter

@@ -1,81 +1,83 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import requests
 
 app = FastAPI()
 
-# Allow your website to access the API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # later change to https://patenthound.co.uk
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-@app.get("/")
-def home():
-    return {"message": "PatentHound API running"}
-
 @app.get("/analyze")
 def analyze(query: str):
 
-    # Example patent results (safe placeholder data)
-    patents = [
-        {
-            "title": "Self adjusting bicycle brake",
-            "patent_number": "US1234567A",
-            "abstract": "Brake mechanism that automatically adjusts tension."
-        },
-        {
-            "title": "Automatic bicycle braking system",
-            "patent_number": "US7654321B",
-            "abstract": "System that activates bicycle brakes automatically."
-        },
-        {
-            "title": "Hydraulic brake actuator",
-            "patent_number": "US9988776C",
-            "abstract": "Hydraulic actuator controlling braking pressure."
-        }
-    ]
-
+    # Build PatentsView search URL
+    base_url = "https://patentsview.org/api/patents/query"
+    
+    # Simple text search on title or abstract
+    q = {
+        "_or": [
+            {"_text_any":{"patent_title": query}},
+            {"_text_any":{"patent_abstract": query}}
+        ]
+    }
+    
+    # Which fields we want in the response
+    f = ["patent_number","patent_title","patent_abstract"]
+    
+    params = {
+        "q": str(q).replace("'", '"'),  # JSON needs double quotes
+        "f": str(f).replace("'", '"'),
+        "o": '{"per_page": 10}'
+    }
+    
+    try:
+        response = requests.get(base_url, params=params, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        patents = data.get("patents", [])
+    except Exception as e:
+        # If anything goes wrong, return empty list
+        print("Error fetching patent data:", e)
+        patents = []
+    
+    # Process results
     results = []
     similarities = []
-
     query_words = set(query.lower().split())
-
+    
     for p in patents:
-
-        title = p["title"]
-        abstract = p["abstract"]
-
-        combined_text = (title + " " + abstract).lower()
-        text_words = set(combined_text.split())
-
-        common_words = query_words.intersection(text_words)
-
-        similarity = min(len(common_words) * 20, 100)
-
+        title = p.get("patent_title","No title")
+        abstract = p.get("patent_abstract","")
+        
+        combined = (title + " " + abstract).lower()
+        text_words = set(combined.split())
+        common = query_words.intersection(text_words)
+        similarity = min(len(common) * 20, 100)
         similarities.append(similarity)
-
+        
         results.append({
             "title": title,
-            "patent_number": p["patent_number"],
+            "patent_number": p.get("patent_number",""),
             "abstract": abstract,
             "similarity": similarity,
-            "url": "https://patents.google.com/?q=" + query.replace(" ", "+")
+            "url": f"https://patents.google.com/patent/{p.get('patent_number','')}"
         })
-
+    
     # Calculate novelty score
-    if len(similarities) > 0:
-        avg_similarity = sum(similarities) / len(similarities)
+    if similarities:
+        avg_sim = sum(similarities)/len(similarities)
     else:
-        avg_similarity = 0
-
-    novelty_score = round(100 - avg_similarity)
-
+        avg_sim = 0
+    novelty_score = round(100 - avg_sim)
+    
     return {
         "query": query,
         "novelty_score": novelty_score,
-        "average_similarity": avg_similarity,
+        "average_similarity": avg_sim,
         "results": results
     }

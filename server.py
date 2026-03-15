@@ -1,13 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import requests
 
 app = FastAPI()
 
-# Allow your website to call the API
+# Allow your website to access the API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # later replace with https://patenthound.co.uk
+    allow_origins=["*"],  # later change to https://patenthound.co.uk
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -20,7 +19,7 @@ def home():
 @app.get("/analyze")
 def analyze(query: str):
 
-    # For now we simulate some patent results
+    # Example patent results (safe placeholder data)
     patents = [
         {
             "title": "Self adjusting bicycle brake",
@@ -49,7 +48,8 @@ def analyze(query: str):
         title = p["title"]
         abstract = p["abstract"]
 
-        text_words = set((title + " " + abstract).lower().split())
+        combined_text = (title + " " + abstract).lower()
+        text_words = set(combined_text.split())
 
         common_words = query_words.intersection(text_words)
 
@@ -62,11 +62,11 @@ def analyze(query: str):
             "patent_number": p["patent_number"],
             "abstract": abstract,
             "similarity": similarity,
-            "url": f"https://patents.google.com/?q={query.replace(' ','+')}"
+            "url": "https://patents.google.com/?q=" + query.replace(" ", "+")
         })
 
     # Calculate novelty score
-    if similarities:
+    if len(similarities) > 0:
         avg_similarity = sum(similarities) / len(similarities)
     else:
         avg_similarity = 0

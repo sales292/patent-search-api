@@ -1,108 +1,81 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
-import io
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import letter
+import requests
 
 app = FastAPI()
 
-# ------------------ Enable CORS ------------------
+# Allow your website to call the API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Replace "*" with your domain for production, e.g., ["https://patenthound.co.uk"]
+    allow_origins=["*"],  # later replace with https://patenthound.co.uk
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ------------------ Mock Analyze Endpoint ------------------
+@app.get("/")
+def home():
+    return {"message": "PatentHound API running"}
+
 @app.get("/analyze")
-def analyze_idea(query: str):
-    """
-    Returns mock patent results for any input query.
-    """
-    results = [
-        {
-            "title": f"{query.title()} Self-Adjusting Device",
-            "patent_number": "US1234567A",
-            "abstract": f"A mechanism related to {query} that automatically adjusts for optimal performance.",
-            "similarity": 25,
-            "url": "https://patents.google.com/patent/US1234567A"
-        },
-        {
-            "title": f"Automatic {query.title()} System",
-            "patent_number": "US7654321B",
-            "abstract": f"A system designed for {query} to activate automatically under certain conditions.",
-            "similarity": 30,
-            "url": "https://patents.google.com/patent/US7654321B"
-        },
-        {
-            "title": f"Hydraulic {query.title()} Actuator",
-            "patent_number": "US9988776C",
-            "abstract": f"A hydraulic actuator controlling {query} performance precisely.",
-            "similarity": 0,
-            "url": "https://patents.google.com/patent/US9988776C"
-        }
-    ]
-    return {"results": results}
+def analyze(query: str):
 
-# ------------------ PDF Download Endpoint ------------------
-@app.get("/download")
-def download_report(query: str):
-    """
-    Generates a PDF report from the same mock data.
-    """
-    results = [
+    # For now we simulate some patent results
+    patents = [
         {
-            "title": f"{query.title()} Self-Adjusting Device",
+            "title": "Self adjusting bicycle brake",
             "patent_number": "US1234567A",
-            "abstract": f"A mechanism related to {query} that automatically adjusts for optimal performance.",
-            "similarity": 25,
-            "url": "https://patents.google.com/patent/US1234567A"
+            "abstract": "Brake mechanism that automatically adjusts tension."
         },
         {
-            "title": f"Automatic {query.title()} System",
+            "title": "Automatic bicycle braking system",
             "patent_number": "US7654321B",
-            "abstract": f"A system designed for {query} to activate automatically under certain conditions.",
-            "similarity": 30,
-            "url": "https://patents.google.com/patent/US7654321B"
+            "abstract": "System that activates bicycle brakes automatically."
         },
         {
-            "title": f"Hydraulic {query.title()} Actuator",
+            "title": "Hydraulic brake actuator",
             "patent_number": "US9988776C",
-            "abstract": f"A hydraulic actuator controlling {query} performance precisely.",
-            "similarity": 0,
-            "url": "https://patents.google.com/patent/US9988776C"
+            "abstract": "Hydraulic actuator controlling braking pressure."
         }
     ]
 
-    buffer = io.BytesIO()
-    pdf = canvas.Canvas(buffer, pagesize=letter)
-    width, height = letter
+    results = []
+    similarities = []
 
-    pdf.setFont("Helvetica-Bold", 16)
-    pdf.drawString(50, height - 50, "PatentHound Idea Analysis Report")
-    pdf.setFont("Helvetica", 12)
-    pdf.drawString(50, height - 80, f"Idea: {query}")
-    pdf.drawString(50, height - 100, f"Total Patents: {len(results)}")
+    query_words = set(query.lower().split())
 
-    y = height - 140
-    for p in results:
-        pdf.setFont("Helvetica-Bold", 12)
-        pdf.drawString(50, y, p["title"])
-        y -= 18
-        pdf.setFont("Helvetica", 10)
-        pdf.drawString(50, y, f"Patent Number: {p['patent_number']}")
-        y -= 14
-        pdf.drawString(50, y, f"Similarity: {p['similarity']}%")
-        y -= 14
-        pdf.drawString(50, y, f"Abstract: {p['abstract']}")
-        y -= 24
-        if y < 100:
-            pdf.showPage()
-            y = height - 50
+    for p in patents:
 
-    pdf.save()
-    buffer.seek(0)
-    return FileResponse(buffer, media_type='application/pdf', filename=f"{query}_PatentHound_Report.pdf")
+        title = p["title"]
+        abstract = p["abstract"]
+
+        text_words = set((title + " " + abstract).lower().split())
+
+        common_words = query_words.intersection(text_words)
+
+        similarity = min(len(common_words) * 20, 100)
+
+        similarities.append(similarity)
+
+        results.append({
+            "title": title,
+            "patent_number": p["patent_number"],
+            "abstract": abstract,
+            "similarity": similarity,
+            "url": f"https://patents.google.com/?q={query.replace(' ','+')}"
+        })
+
+    # Calculate novelty score
+    if similarities:
+        avg_similarity = sum(similarities) / len(similarities)
+    else:
+        avg_similarity = 0
+
+    novelty_score = round(100 - avg_similarity)
+
+    return {
+        "query": query,
+        "novelty_score": novelty_score,
+        "average_similarity": avg_similarity,
+        "results": results
+    }

@@ -32,3 +32,4 @@ def analyze(query: str):
         "novelty": novelty,
         "risk": "Medium",
         "results": results
+    }

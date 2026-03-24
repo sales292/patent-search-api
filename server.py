@@ -16,7 +16,7 @@ app.add_middleware(
 # =========================
 # STRIPE SETUP
 # =========================
-stripe.api_key = "https://buy.stripe.com/test_3cI28teFP3MCcum4GZ6Na00"
+stripe.api_key = "STRIPE_SECRET_KEY"
 
 paid_users = set()
 

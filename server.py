@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import stripe
+import uuid
 
 app = FastAPI()
 
@@ -11,10 +13,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# =========================
+# STRIPE SETUP
+# =========================
+stripe.api_key = "https://buy.stripe.com/test_3cI28teFP3MCcum4GZ6Na00"
+
+paid_users = set()
+
+# =========================
+# HOME TEST
+# =========================
 @app.get("/")
 def home():
     return {"status": "running"}
 
+# =========================
+# ANALYZE (FREE ONLY FOR NOW)
+# =========================
 @app.get("/analyze")
 def analyze(query: str):
 
@@ -31,5 +46,31 @@ def analyze(query: str):
         "query": query,
         "novelty": novelty,
         "risk": "Medium",
-        "results": results
+        "results": results,
+        "paid": False
     }
+
+# =========================
+# CREATE STRIPE CHECKOUT
+# =========================
+@app.post("/create-checkout")
+def create_checkout():
+
+    session = stripe.checkout.Session.create(
+        payment_method_types=["card"],
+        mode="payment",
+        line_items=[{
+            "price_data": {
+                "currency": "gbp",
+                "product_data": {
+                    "name": "PatentHound Full Report"
+                },
+                "unit_amount": 499,
+            },
+            "quantity": 1,
+        }],
+        success_url="https://patenthound.co.uk/success",
+        cancel_url="https://patenthound.co.uk"
+    )
+
+    return {"url": session.url}

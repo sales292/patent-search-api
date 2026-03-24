@@ -16,7 +16,8 @@ app.add_middleware(
 # =========================
 # STRIPE SETUP
 # =========================
-stripestripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+import os
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
 paid_users = set()
 

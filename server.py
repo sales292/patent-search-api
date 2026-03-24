@@ -1,12 +1,11 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import os
+import uuid
+import stripe
 
 app = FastAPI()
 
-# =========================
-# CORS (allow frontend)
-# =========================
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -16,34 +15,27 @@ app.add_middleware(
 )
 
 # =========================
-# STRIPE (SAFE INIT)
+# STRIPE SETUP
 # =========================
-stripe = None
-STRIPE_KEY = os.getenv("STRIPE_SECRET_KEY")
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
-if STRIPE_KEY:
-    try:
-        import stripe as stripe_lib
-        stripe_lib.api_key = STRIPE_KEY
-        stripe = stripe_lib
-        print("Stripe loaded")
-    except Exception as e:
-        print("Stripe failed:", e)
-else:
-    print("Stripe not configured (safe mode)")
+# simple in-memory store (OK for MVP)
+paid_tokens = set()
 
 # =========================
-# HOME TEST
+# HOME
 # =========================
 @app.get("/")
 def home():
     return {"status": "running"}
 
 # =========================
-# ANALYZER
+# ANALYZE (LOCKED)
 # =========================
 @app.get("/analyze")
-def analyze(query: str):
+def analyze(query: str, token: str = None):
+
+    is_paid = token in paid_tokens
 
     results = [
         {"title": f"{query} system A", "abstract": "Patent example A", "similarity": 40},
@@ -51,45 +43,59 @@ def analyze(query: str):
         {"title": f"{query} system C", "abstract": "Patent example C", "similarity": 20}
     ]
 
-    avg = sum(r["similarity"] for r in results) / len(results)
-    novelty = round(100 - avg)
+    novelty = 70
+
+    # 🔒 LOCKED VIEW FOR FREE USERS
+    if not is_paid:
+        results = [
+            {"title": r["title"], "abstract": "🔒 Unlock to view full details", "similarity": None}
+            for r in results
+        ]
 
     return {
         "query": query,
         "novelty": novelty,
         "risk": "Medium",
-        "results": results,
-        "paid": False
+        "paid": is_paid,
+        "results": results
     }
 
 # =========================
-# STRIPE CHECKOUT
+# CREATE CHECKOUT
 # =========================
 @app.post("/create-checkout")
 def create_checkout():
 
-    if stripe is None:
-        return {"error": "Stripe not configured"}
-
-    try:
-        session = stripe.checkout.Session.create(
-            payment_method_types=["card"],
-            mode="payment",
-            line_items=[{
-                "price_data": {
-                    "currency": "gbp",
-                    "product_data": {
-                        "name": "PatentHound Full Report"
-                    },
-                    "unit_amount": 499,
+    session = stripe.checkout.Session.create(
+        payment_method_types=["card"],
+        mode="payment",
+        line_items=[{
+            "price_data": {
+                "currency": "gbp",
+                "product_data": {
+                    "name": "PatentHound Full Report Access"
                 },
-                "quantity": 1,
-            }],
-            success_url="https://patenthound.co.uk/success",
-            cancel_url="https://patenthound.co.uk/cancel"
-        )
+                "unit_amount": 499,
+            },
+            "quantity": 1,
+        }],
+        success_url="https://patenthound.co.uk/success?session_id={CHECKOUT_SESSION_ID}",
+        cancel_url="https://patenthound.co.uk/cancel"
+    )
 
-        return {"url": session.url}
+    return {"url": session.url}
 
-    except Exception as e:
-        return {"error": str(e)}
+# =========================
+# STRIPE SUCCESS CONFIRMATION
+# =========================
+@app.get("/verify-payment")
+def verify_payment(session_id: str):
+
+    session = stripe.checkout.Session.retrieve(session_id)
+
+    if session.payment_status == "paid":
+        token = str(uuid.uuid4())
+        paid_tokens.add(token)
+        return {"token": token}
+
+    return {"error": "not paid"}

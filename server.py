@@ -22,6 +22,7 @@ app.add_middleware(
 
 # Stripe setup
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+print("STRIPE KEY LOADED:", stripe.api_key)
 
 # Simple in-memory token store
 paid_tokens = set()

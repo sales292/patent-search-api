@@ -2,7 +2,6 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 import os
-import uuid
 import stripe
 import json
 from io import BytesIO
@@ -11,35 +10,35 @@ from reportlab.pdfgen import canvas
 
 app = FastAPI()
 
-# -----------------------------
+# -----------------------
 # CORS
-# -----------------------------
+# -----------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # tighten later to your domain
+    allow_origins=["*"],  # lock to your domain later
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# -----------------------------
-# Stripe
-# -----------------------------
+# -----------------------
+# STRIPE SETUP
+# -----------------------
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
-# TEMP MVP storage (replace with DB later)
+# store paid sessions (MVP - upgrade to DB later)
 paid_sessions = set()
 
-# -----------------------------
+# -----------------------
 # HEALTH CHECK
-# -----------------------------
+# -----------------------
 @app.get("/")
 def home():
-    return {"status": "running"}
+    return {"status": "ok"}
 
-# -----------------------------
+# -----------------------
 # ANALYZE ENDPOINT
-# -----------------------------
+# -----------------------
 @app.get("/analyze")
 def analyze(query: str, session_id: str = None):
 
@@ -51,14 +50,11 @@ def analyze(query: str, session_id: str = None):
         {"title": f"{query} system C", "abstract": "Patent example C", "similarity": 18},
     ]
 
-    novelty = 70
-
-    # lock details if not paid
     if not is_paid:
         results = [
             {
                 "title": r["title"],
-                "abstract": "🔒 Unlock full patent details",
+                "abstract": "🔒 Unlock full details",
                 "similarity": None
             }
             for r in results
@@ -66,15 +62,15 @@ def analyze(query: str, session_id: str = None):
 
     return {
         "query": query,
-        "novelty": novelty,
+        "novelty": 70,
         "risk": "Medium",
         "paid": is_paid,
         "results": results
     }
 
-# -----------------------------
+# -----------------------
 # STRIPE CHECKOUT
-# -----------------------------
+# -----------------------
 @app.post("/create-checkout")
 def create_checkout():
 
@@ -93,7 +89,7 @@ def create_checkout():
                 "quantity": 1,
             }],
             success_url="https://patenthound.co.uk/subscription?session_id={CHECKOUT_SESSION_ID}",
-            cancel_url="https://patenthound.co.uk/cancel"
+            cancel_url="https://patenthound.co.uk/subscription"
         )
 
         return {"url": session.url}
@@ -102,14 +98,13 @@ def create_checkout():
         print("Stripe error:", str(e))
         return {"error": str(e)}
 
-# -----------------------------
-# STRIPE WEBHOOK (CORE SaaS LOGIC)
-# -----------------------------
+# -----------------------
+# STRIPE WEBHOOK (SOURCE OF TRUTH)
+# -----------------------
 @app.post("/stripe-webhook")
 async def stripe_webhook(request: Request):
 
     payload = await request.body()
-    event = None
 
     try:
         event = json.loads(payload)
@@ -129,9 +124,20 @@ async def stripe_webhook(request: Request):
 
     return {"status": "success"}
 
-# -----------------------------
+# -----------------------
+# VERIFY PAYMENT (FRONTEND SAFE CHECK)
+# -----------------------
+@app.get("/verify-payment")
+def verify_payment(session_id: str):
+
+    if session_id in paid_sessions:
+        return {"paid": True}
+
+    return {"paid": False}
+
+# -----------------------
 # PDF DOWNLOAD (PROTECTED)
-# -----------------------------
+# -----------------------
 @app.get("/download-pdf")
 def download_pdf(query: str, session_id: str = None):
 
@@ -140,8 +146,8 @@ def download_pdf(query: str, session_id: str = None):
 
     buffer = BytesIO()
     p = canvas.Canvas(buffer, pagesize=A4)
-    width, height = A4
-    y = height - 60
+
+    y = 800
 
     p.setFont("Helvetica-Bold", 14)
     p.drawString(50, y, f"PatentHound Report: {query}")
@@ -149,23 +155,21 @@ def download_pdf(query: str, session_id: str = None):
     y -= 40
     p.setFont("Helvetica", 10)
     p.drawString(50, y, "Novelty Score: 70/100")
+
     y -= 20
     p.drawString(50, y, "Risk Level: Medium")
 
     y -= 40
     p.drawString(50, y, "Similar Patents:")
 
-    sample = [
+    samples = [
         "Patent A - system design",
-        "Patent B - mechanical structure",
-        "Patent C - control method"
+        "Patent B - mechanical method",
+        "Patent C - control system"
     ]
 
     y -= 20
-    for item in sample:
-        if y < 80:
-            p.showPage()
-            y = height - 60
+    for item in samples:
         p.drawString(50, y, item)
         y -= 20
 

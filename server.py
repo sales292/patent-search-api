@@ -61,22 +61,37 @@ def analyze(query: str, token: str = None):
 # ---------- Create Checkout ----------
 @app.post("/create-checkout")
 def create_checkout():
-    session = stripe.checkout.Session.create(
-        payment_method_types=["card"],
-        mode="payment",
-        line_items=[{
-            "price_data": {
-                "currency": "gbp",
-                "product_data": {"name": "PatentHound Full Report Access"},
-                "unit_amount": 499,
-            },
-            "quantity": 1,
-        }],
-        success_url="https://patenthound.co.uk/success?session_id={CHECKOUT_SESSION_ID}",
-        cancel_url="https://patenthound.co.uk/cancel"
-    )
-    return {"url": session.url}
 
+    try:
+
+        print("CHECKOUT ENDPOINT HIT")
+
+        session = stripe.checkout.Session.create(
+            payment_method_types=["card"],
+            mode="payment",
+            line_items=[{
+                "price_data": {
+                    "currency": "gbp",
+                    "product_data": {
+                        "name": "PatentHound Full Report"
+                    },
+                    "unit_amount": 499,
+                },
+                "quantity": 1,
+            }],
+            success_url="https://patenthound.co.uk/success",
+            cancel_url="https://patenthound.co.uk/cancel"
+        )
+
+        print("CHECKOUT CREATED:", session.url)
+
+        return {"url": session.url}
+
+    except Exception as e:
+
+        print("STRIPE ERROR:", str(e))
+
+        return {"error": str(e)}
 # ---------- Verify Payment ----------
 @app.get("/verify-payment")
 def verify_payment(session_id: str):

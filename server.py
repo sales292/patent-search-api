@@ -1,53 +1,66 @@
-# server.py
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 import os
 import uuid
 import stripe
+import json
 from io import BytesIO
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
 app = FastAPI()
 
+# -----------------------------
 # CORS
+# -----------------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # tighten later to your domain
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Stripe setup
+# -----------------------------
+# Stripe
+# -----------------------------
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
-print("STRIPE KEY LOADED:", stripe.api_key)
 
-# Simple in-memory token store
-paid_tokens = set()
+# TEMP MVP storage (replace with DB later)
+paid_sessions = set()
 
-# ---------- Home ----------
+# -----------------------------
+# HEALTH CHECK
+# -----------------------------
 @app.get("/")
 def home():
     return {"status": "running"}
 
-# ---------- Analyze ----------
+# -----------------------------
+# ANALYZE ENDPOINT
+# -----------------------------
 @app.get("/analyze")
-def analyze(query: str, token: str = None):
-    is_paid = token in paid_tokens
+def analyze(query: str, session_id: str = None):
+
+    is_paid = session_id in paid_sessions
 
     results = [
-        {"title": f"{query} system A", "abstract": "Patent example A", "similarity": 40},
-        {"title": f"{query} system B", "abstract": "Patent example B", "similarity": 30},
-        {"title": f"{query} system C", "abstract": "Patent example C", "similarity": 20},
+        {"title": f"{query} system A", "abstract": "Patent example A", "similarity": 42},
+        {"title": f"{query} system B", "abstract": "Patent example B", "similarity": 31},
+        {"title": f"{query} system C", "abstract": "Patent example C", "similarity": 18},
     ]
 
     novelty = 70
 
+    # lock details if not paid
     if not is_paid:
         results = [
-            {"title": r["title"], "abstract": "🔒 Unlock to view full details", "similarity": None}
+            {
+                "title": r["title"],
+                "abstract": "🔒 Unlock full patent details",
+                "similarity": None
+            }
             for r in results
         ]
 
@@ -59,14 +72,13 @@ def analyze(query: str, token: str = None):
         "results": results
     }
 
-# ---------- Create Checkout ----------
+# -----------------------------
+# STRIPE CHECKOUT
+# -----------------------------
 @app.post("/create-checkout")
 def create_checkout():
 
     try:
-
-        print("CHECKOUT ENDPOINT HIT")
-
         session = stripe.checkout.Session.create(
             payment_method_types=["card"],
             mode="payment",
@@ -80,42 +92,57 @@ def create_checkout():
                 },
                 "quantity": 1,
             }],
-            success_url="https://patenthound.co.uk/success",
+            success_url="https://patenthound.co.uk/success?session_id={CHECKOUT_SESSION_ID}",
             cancel_url="https://patenthound.co.uk/cancel"
         )
-
-        print("CHECKOUT CREATED:", session.url)
 
         return {"url": session.url}
 
     except Exception as e:
-
-        print("STRIPE ERROR:", str(e))
-
+        print("Stripe error:", str(e))
         return {"error": str(e)}
-# ---------- Verify Payment ----------
-@app.get("/verify-payment")
-def verify_payment(session_id: str):
-    session = stripe.checkout.Session.retrieve(session_id)
-    if session.payment_status == "paid":
-        token = str(uuid.uuid4())
-        paid_tokens.add(token)
-        return {"token": token}
-    return {"error": "not paid"}
 
-# ---------- Download PDF ----------
+# -----------------------------
+# STRIPE WEBHOOK (CORE SaaS LOGIC)
+# -----------------------------
+@app.post("/stripe-webhook")
+async def stripe_webhook(request: Request):
+
+    payload = await request.body()
+    event = None
+
+    try:
+        event = json.loads(payload)
+    except Exception as e:
+        print("Webhook parse error:", str(e))
+        return {"status": "invalid"}
+
+    if event.get("type") == "checkout.session.completed":
+
+        session = event["data"]["object"]
+        session_id = session.get("id")
+
+        print("PAYMENT SUCCESS:", session_id)
+
+        if session_id:
+            paid_sessions.add(session_id)
+
+    return {"status": "success"}
+
+# -----------------------------
+# PDF DOWNLOAD (PROTECTED)
+# -----------------------------
 @app.get("/download-pdf")
-def download_pdf(query: str, token: str = None):
-    is_paid = token in paid_tokens
-    if not is_paid:
+def download_pdf(query: str, session_id: str = None):
+
+    if session_id not in paid_sessions:
         return {"error": "Payment required"}
 
     buffer = BytesIO()
     p = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
-    y = height - 50
+    y = height - 60
 
-    # Header
     p.setFont("Helvetica-Bold", 14)
     p.drawString(50, y, f"PatentHound Report: {query}")
 
@@ -124,20 +151,22 @@ def download_pdf(query: str, token: str = None):
     p.drawString(50, y, "Novelty Score: 70/100")
     y -= 20
     p.drawString(50, y, "Risk Level: Medium")
+
     y -= 40
     p.drawString(50, y, "Similar Patents:")
 
-    sample_results = [
-        "Patent A - bicycle brake system",
-        "Patent B - braking mechanism",
-        "Patent C - hydraulic control system"
+    sample = [
+        "Patent A - system design",
+        "Patent B - mechanical structure",
+        "Patent C - control method"
     ]
+
     y -= 20
-    for r in sample_results:
+    for item in sample:
         if y < 80:
             p.showPage()
-            y = height - 50
-        p.drawString(50, y, r)
+            y = height - 60
+        p.drawString(50, y, item)
         y -= 20
 
     p.save()

@@ -92,7 +92,7 @@ def create_checkout():
                 },
                 "quantity": 1,
             }],
-            success_url="https://patenthound.co.uk/success?session_id={CHECKOUT_SESSION_ID}",
+            success_url="https://patenthound.co.uk/subscription?session_id={CHECKOUT_SESSION_ID}",
             cancel_url="https://patenthound.co.uk/cancel"
         )
 

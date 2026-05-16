@@ -19,7 +19,7 @@ app = FastAPI()
 # =========================================================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # lock to your domain later
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -30,7 +30,7 @@ app.add_middleware(
 # =========================================================
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
-# temporary paid session store (upgrade later to database)
+# temporary session storage
 paid_sessions = set()
 
 # =========================================================
@@ -69,7 +69,6 @@ def analyze(query: str, session_id: str = None):
         }
     ]
 
-    # lock results if unpaid
     if not is_paid:
         results = [
             {
@@ -171,7 +170,6 @@ def verify_payment(session_id: str):
 @app.get("/download-pdf")
 def download_pdf(query: str, session_id: str = None):
 
-    # verify payment
     if session_id not in paid_sessions:
         return {"error": "Payment required"}
 
@@ -238,7 +236,7 @@ def download_pdf(query: str, session_id: str = None):
     p.setFont("Helvetica-Bold", 16)
     p.drawString(50, y, "Executive Summary")
 
-    y -= 25
+    y -= 30
 
     summary = (
         f"The invention concept '{query}' demonstrates moderate originality "
@@ -246,18 +244,23 @@ def download_pdf(query: str, session_id: str = None):
         "were identified with partial functional overlap in structure and implementation."
     )
 
-    wrapped = simpleSplit(summary, "Helvetica", 11, 470)
+    wrapped_summary = simpleSplit(
+        summary,
+        "Helvetica",
+        11,
+        430
+    )
 
     text = p.beginText(50, y)
     text.setFont("Helvetica", 11)
-    text.setLeading(18)
+    text.setLeading(20)
 
-    for line in wrapped:
+    for line in wrapped_summary:
         text.textLine(line)
 
     p.drawText(text)
 
-    y -= (len(wrapped) * 18) + 35
+    y -= (len(wrapped_summary) * 20) + 55
 
     # =========================================================
     # NOVELTY SCORE
@@ -279,11 +282,9 @@ def download_pdf(query: str, session_id: str = None):
         novelty_colour = RED
         novelty_label = "Low Uniqueness"
 
-    # background bar
     p.setFillColor(LIGHT)
     p.roundRect(50, y, 400, 20, 6, fill=1, stroke=0)
 
-    # score bar
     p.setFillColor(novelty_colour)
     p.roundRect(50, y, novelty * 4, 20, 6, fill=1, stroke=0)
 
@@ -333,18 +334,23 @@ def download_pdf(query: str, session_id: str = None):
         "within related technical categories. Further professional review is recommended."
     )
 
-    wrapped = simpleSplit(risk_text, "Helvetica", 11, 470)
+    wrapped_risk = simpleSplit(
+        risk_text,
+        "Helvetica",
+        11,
+        430
+    )
 
     text = p.beginText(50, y)
     text.setFont("Helvetica", 11)
     text.setLeading(18)
 
-    for line in wrapped:
+    for line in wrapped_risk:
         text.textLine(line)
 
     p.drawText(text)
 
-    y -= (len(wrapped) * 18) + 40
+    y -= (len(wrapped_risk) * 18) + 40
 
     # =========================================================
     # SIMILAR PATENTS
@@ -379,16 +385,13 @@ def download_pdf(query: str, session_id: str = None):
             p.showPage()
             y = height - 60
 
-        # card background
         p.setFillColor(LIGHT)
         p.roundRect(50, y - 60, 495, 70, 8, fill=1, stroke=0)
 
-        # title
         p.setFillColor(DARK)
         p.setFont("Helvetica-Bold", 12)
         p.drawString(65, y - 20, patent["title"])
 
-        # match badge
         p.setFillColor(BLUE)
         p.roundRect(430, y - 25, 90, 20, 8, fill=1, stroke=0)
 
@@ -396,8 +399,7 @@ def download_pdf(query: str, session_id: str = None):
         p.setFont("Helvetica-Bold", 10)
         p.drawCentredString(475, y - 18, patent["match"] + " Match")
 
-        # summary
-        wrapped = simpleSplit(
+        wrapped_summary = simpleSplit(
             patent["summary"],
             "Helvetica",
             10,
@@ -408,7 +410,7 @@ def download_pdf(query: str, session_id: str = None):
         text.setFont("Helvetica", 10)
         text.setLeading(14)
 
-        for line in wrapped:
+        for line in wrapped_summary:
             text.textLine(line)
 
         p.drawText(text)
@@ -435,9 +437,14 @@ def download_pdf(query: str, session_id: str = None):
 
     for item in recommendations:
 
-        wrapped = simpleSplit(item, "Helvetica", 11, 450)
+        wrapped_item = simpleSplit(
+            item,
+            "Helvetica",
+            11,
+            430
+        )
 
-        for line in wrapped:
+        for line in wrapped_item:
             p.drawString(65, y, f"• {line}")
             y -= 18
 
@@ -459,14 +466,19 @@ def download_pdf(query: str, session_id: str = None):
         "PatentHound does not provide legal advice or guarantee patentability."
     )
 
-    wrapped = simpleSplit(disclaimer, "Helvetica", 8, 470)
+    wrapped_disclaimer = simpleSplit(
+        disclaimer,
+        "Helvetica",
+        8,
+        430
+    )
 
     text = p.beginText(50, y)
     text.setFont("Helvetica", 8)
     text.setFillColor(GREY)
     text.setLeading(12)
 
-    for line in wrapped:
+    for line in wrapped_disclaimer:
         text.textLine(line)
 
     p.drawText(text)

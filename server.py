@@ -8,6 +8,7 @@ from io import BytesIO
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.colors import HexColor
+from reportlab.lib.utils import simpleSplit
 
 app = FastAPI()
 
@@ -207,20 +208,22 @@ def download_pdf(query: str, session_id: str = None):
     p.setFont("Helvetica", 11)
 
     summary = (
-        f"The invention concept '{query}' demonstrates moderate originality "
-        "based on currently indexed patent references. Several related patents "
-        "were identified with partial functional overlap in structure and implementation."
-    )
+    f"The invention concept '{query}' demonstrates moderate originality "
+    "based on currently indexed patent references. Several related patents "
+    "were identified with partial functional overlap in structure and implementation."
+)
 
-    text = p.beginText(50, y)
-    text.setLeading(18)
+wrapped = simpleSplit(summary, "Helvetica", 11, 470)
 
-    for line in summary.split(". "):
-        text.textLine(line.strip())
+text = p.beginText(50, y)
+text.setLeading(18)
 
-    p.drawText(text)
+for line in wrapped:
+    text.textLine(line)
 
-    y -= 90
+p.drawText(text)
+
+y -= (len(wrapped) * 18)
 
     # ==========================================
     # NOVELTY SCORE SECTION
@@ -379,12 +382,11 @@ def download_pdf(query: str, session_id: str = None):
     y -= 30
 
     recommendations = [
-        "Conduct a deeper professional patent review",
-        "Investigate claim wording within similar patents",
-        "Document invention variations and improvements",
-        "Consider filing provisional patent protection"
-    ]
-
+    "Conduct a deeper patent search using Google Patents or a registered patent attorney",
+    "Review claim wording within similar existing patents",
+    "Document invention improvements and unique variations",
+    "Consider provisional patent protection before public disclosure"
+]
     p.setFont("Helvetica", 11)
 
     for item in recommendations:

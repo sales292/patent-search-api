@@ -30,7 +30,7 @@ app.add_middleware(
 # =========================================================
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
-# temporary session storage
+# temporary paid session storage
 paid_sessions = set()
 
 # =========================================================
@@ -69,6 +69,7 @@ def analyze(query: str, session_id: str = None):
         }
     ]
 
+    # lock details until payment
     if not is_paid:
         results = [
             {
@@ -252,6 +253,8 @@ def download_pdf(query: str, session_id: str = None):
     )
 
     text = p.beginText(50, y)
+
+    text.setFillColor(DARK)
     text.setFont("Helvetica", 11)
     text.setLeading(20)
 
@@ -342,6 +345,8 @@ def download_pdf(query: str, session_id: str = None):
     )
 
     text = p.beginText(50, y)
+
+    text.setFillColor(DARK)
     text.setFont("Helvetica", 11)
     text.setLeading(18)
 
@@ -388,10 +393,12 @@ def download_pdf(query: str, session_id: str = None):
         p.setFillColor(LIGHT)
         p.roundRect(50, y - 60, 495, 70, 8, fill=1, stroke=0)
 
+        # title
         p.setFillColor(DARK)
         p.setFont("Helvetica-Bold", 12)
         p.drawString(65, y - 20, patent["title"])
 
+        # match badge
         p.setFillColor(BLUE)
         p.roundRect(430, y - 25, 90, 20, 8, fill=1, stroke=0)
 
@@ -399,6 +406,7 @@ def download_pdf(query: str, session_id: str = None):
         p.setFont("Helvetica-Bold", 10)
         p.drawCentredString(475, y - 18, patent["match"] + " Match")
 
+        # summary text
         wrapped_summary = simpleSplit(
             patent["summary"],
             "Helvetica",
@@ -406,16 +414,14 @@ def download_pdf(query: str, session_id: str = None):
             340
         )
 
-       text = p.beginText(65, y - 40)
+        text = p.beginText(65, y - 40)
 
-        # force dark readable text
         text.setFillColor(DARK)
-
         text.setFont("Helvetica", 10)
         text.setLeading(14)
 
         for line in wrapped_summary:
-        text.textLine(line)
+            text.textLine(line)
 
         p.drawText(text)
 
@@ -437,6 +443,7 @@ def download_pdf(query: str, session_id: str = None):
         "Consider provisional patent protection before public disclosure"
     ]
 
+    p.setFillColor(DARK)
     p.setFont("Helvetica", 11)
 
     for item in recommendations:
@@ -478,8 +485,9 @@ def download_pdf(query: str, session_id: str = None):
     )
 
     text = p.beginText(50, y)
-    text.setFont("Helvetica", 8)
+
     text.setFillColor(GREY)
+    text.setFont("Helvetica", 8)
     text.setLeading(12)
 
     for line in wrapped_disclaimer:

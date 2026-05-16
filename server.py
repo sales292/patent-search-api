@@ -85,12 +85,12 @@ def create_checkout():
                     "product_data": {
                         "name": "PatentHound Full Report"
                     },
-                    "unit_amount": 499,
+                    "unit_amount": 899,
                 },
                 "quantity": 1,
             }],
             success_url="https://patenthound.co.uk/subscription?session_id={CHECKOUT_SESSION_ID}",
-            cancel_url="https://patenthound.co.uk/subscription"
+            cancel_url="https://patenthound.co.uk/patent-analyzer"
         )
 
         return {"url": session.url}

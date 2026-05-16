@@ -4,7 +4,9 @@ from fastapi.responses import StreamingResponse
 import os
 import stripe
 import json
+
 from io import BytesIO
+
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.colors import HexColor
@@ -12,9 +14,9 @@ from reportlab.lib.utils import simpleSplit
 
 app = FastAPI()
 
-# -----------------------
+# =========================================================
 # CORS
-# -----------------------
+# =========================================================
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # lock to your domain later
@@ -23,63 +25,82 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# -----------------------
-# STRIPE SETUP
-# -----------------------
+# =========================================================
+# STRIPE
+# =========================================================
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
-# store paid sessions (MVP - upgrade to DB later)
+# temporary paid session store (upgrade later to database)
 paid_sessions = set()
 
-# -----------------------
-# HEALTH CHECK
-# -----------------------
+# =========================================================
+# HOME
+# =========================================================
 @app.get("/")
 def home():
     return {"status": "ok"}
 
-# -----------------------
-# ANALYZE ENDPOINT
-# -----------------------
+# =========================================================
+# ANALYZE
+# =========================================================
 @app.get("/analyze")
 def analyze(query: str, session_id: str = None):
 
     is_paid = session_id in paid_sessions
 
     results = [
-        {"title": f"{query} system A", "abstract": "Patent example A", "similarity": 42},
-        {"title": f"{query} system B", "abstract": "Patent example B", "similarity": 31},
-        {"title": f"{query} system C", "abstract": "Patent example C", "similarity": 18},
+        {
+            "title": f"{query} mechanical control system",
+            "abstract": "Mechanical structure overlap in operational design and braking functionality.",
+            "similarity": 42,
+            "url": "https://patents.google.com/"
+        },
+        {
+            "title": f"{query} hydraulic actuator mechanism",
+            "abstract": "Partial similarity in component interaction and force application methodology.",
+            "similarity": 34,
+            "url": "https://patents.google.com/"
+        },
+        {
+            "title": f"{query} automated safety assembly",
+            "abstract": "Lower overlap detected in automation and control sequencing behaviour.",
+            "similarity": 27,
+            "url": "https://patents.google.com/"
+        }
     ]
 
+    # lock results if unpaid
     if not is_paid:
         results = [
             {
                 "title": r["title"],
                 "abstract": "🔒 Unlock full details",
-                "similarity": None
+                "similarity": None,
+                "url": None
             }
             for r in results
         ]
 
     return {
         "query": query,
-        "novelty": 70,
+        "novelty": 72,
         "risk": "Medium",
         "paid": is_paid,
         "results": results
     }
 
-# -----------------------
-# STRIPE CHECKOUT
-# -----------------------
+# =========================================================
+# CREATE STRIPE CHECKOUT
+# =========================================================
 @app.post("/create-checkout")
 def create_checkout():
 
     try:
+
         session = stripe.checkout.Session.create(
             payment_method_types=["card"],
             mode="payment",
+
             line_items=[{
                 "price_data": {
                     "currency": "gbp",
@@ -90,6 +111,7 @@ def create_checkout():
                 },
                 "quantity": 1,
             }],
+
             success_url="https://patenthound.co.uk/patent-analyzer?session_id={CHECKOUT_SESSION_ID}",
             cancel_url="https://patenthound.co.uk/patent-analyzer"
         )
@@ -97,12 +119,14 @@ def create_checkout():
         return {"url": session.url}
 
     except Exception as e:
+
         print("Stripe error:", str(e))
+
         return {"error": str(e)}
 
-# -----------------------
-# STRIPE WEBHOOK (SOURCE OF TRUTH)
-# -----------------------
+# =========================================================
+# STRIPE WEBHOOK
+# =========================================================
 @app.post("/stripe-webhook")
 async def stripe_webhook(request: Request):
 
@@ -110,13 +134,17 @@ async def stripe_webhook(request: Request):
 
     try:
         event = json.loads(payload)
+
     except Exception as e:
+
         print("Webhook parse error:", str(e))
+
         return {"status": "invalid"}
 
     if event.get("type") == "checkout.session.completed":
 
         session = event["data"]["object"]
+
         session_id = session.get("id")
 
         print("PAYMENT SUCCESS:", session_id)
@@ -126,9 +154,9 @@ async def stripe_webhook(request: Request):
 
     return {"status": "success"}
 
-# -----------------------
-# VERIFY PAYMENT (FRONTEND SAFE CHECK)
-# -----------------------
+# =========================================================
+# VERIFY PAYMENT
+# =========================================================
 @app.get("/verify-payment")
 def verify_payment(session_id: str):
 
@@ -137,9 +165,9 @@ def verify_payment(session_id: str):
 
     return {"paid": False}
 
-# -----------------------
-# PDF DOWNLOAD (PROTECTED)
-# -----------------------
+# =========================================================
+# DOWNLOAD PDF
+# =========================================================
 @app.get("/download-pdf")
 def download_pdf(query: str, session_id: str = None):
 
@@ -155,22 +183,23 @@ def download_pdf(query: str, session_id: str = None):
 
     y = height - 60
 
-    # ==========================================
+    # =========================================================
     # COLOURS
-    # ==========================================
+    # =========================================================
     GREEN = HexColor("#22c55e")
     ORANGE = HexColor("#f59e0b")
     RED = HexColor("#ef4444")
     DARK = HexColor("#111827")
     LIGHT = HexColor("#f3f4f6")
     BLUE = HexColor("#635bff")
+    GREY = HexColor("#6b7280")
 
     novelty = 72
     risk = "Medium"
 
-    # ==========================================
+    # =========================================================
     # HEADER
-    # ==========================================
+    # =========================================================
     p.setFillColor(DARK)
     p.setFont("Helvetica-Bold", 24)
     p.drawString(50, y, "PatentHound™")
@@ -182,11 +211,17 @@ def download_pdf(query: str, session_id: str = None):
 
     y -= 20
 
+    from datetime import datetime
+
     p.setFont("Helvetica", 10)
+
     p.drawString(50, y, f"Generated for: {query}")
 
-    from datetime import datetime
-    p.drawString(350, y, datetime.now().strftime("%d %B %Y"))
+    p.drawString(
+        350,
+        y,
+        datetime.now().strftime("%d %B %Y")
+    )
 
     y -= 25
 
@@ -194,9 +229,9 @@ def download_pdf(query: str, session_id: str = None):
     p.setLineWidth(2)
     p.line(50, y, 545, y)
 
-    # ==========================================
+    # =========================================================
     # EXECUTIVE SUMMARY
-    # ==========================================
+    # =========================================================
     y -= 45
 
     p.setFillColor(DARK)
@@ -205,35 +240,34 @@ def download_pdf(query: str, session_id: str = None):
 
     y -= 25
 
-    p.setFont("Helvetica", 11)
-
     summary = (
-    f"The invention concept '{query}' demonstrates moderate originality "
-    "based on currently indexed patent references. Several related patents "
-    "were identified with partial functional overlap in structure and implementation."
-)
+        f"The invention concept '{query}' demonstrates moderate originality "
+        "based on currently indexed patent references. Several related patents "
+        "were identified with partial functional overlap in structure and implementation."
+    )
 
-wrapped = simpleSplit(summary, "Helvetica", 11, 470)
+    wrapped = simpleSplit(summary, "Helvetica", 11, 470)
 
-text = p.beginText(50, y)
-text.setLeading(18)
+    text = p.beginText(50, y)
+    text.setFont("Helvetica", 11)
+    text.setLeading(18)
 
-for line in wrapped:
-    text.textLine(line)
+    for line in wrapped:
+        text.textLine(line)
 
-p.drawText(text)
+    p.drawText(text)
 
-y -= (len(wrapped) * 18)
+    y -= (len(wrapped) * 18) + 35
 
-    # ==========================================
-    # NOVELTY SCORE SECTION
-    # ==========================================
+    # =========================================================
+    # NOVELTY SCORE
+    # =========================================================
+    p.setFillColor(DARK)
     p.setFont("Helvetica-Bold", 16)
     p.drawString(50, y, "Novelty Score")
 
     y -= 30
 
-    # novelty colour
     novelty_colour = GREEN
     novelty_label = "Highly Unique"
 
@@ -260,15 +294,15 @@ y -= (len(wrapped) * 18)
     y -= 35
 
     p.setFillColor(novelty_colour)
-    p.roundRect(50, y, 120, 24, 10, fill=1, stroke=0)
+    p.roundRect(50, y, 140, 24, 10, fill=1, stroke=0)
 
     p.setFillColorRGB(1, 1, 1)
     p.setFont("Helvetica-Bold", 10)
-    p.drawCentredString(110, y + 8, novelty_label)
+    p.drawCentredString(120, y + 8, novelty_label)
 
-    # ==========================================
+    # =========================================================
     # RISK SECTION
-    # ==========================================
+    # =========================================================
     y -= 55
 
     p.setFillColor(DARK)
@@ -294,27 +328,28 @@ y -= (len(wrapped) * 18)
 
     y -= 40
 
-    p.setFillColor(DARK)
-    p.setFont("Helvetica", 11)
-
     risk_text = (
         "The submitted invention may overlap with certain existing patents "
         "within related technical categories. Further professional review is recommended."
     )
 
+    wrapped = simpleSplit(risk_text, "Helvetica", 11, 470)
+
     text = p.beginText(50, y)
+    text.setFont("Helvetica", 11)
     text.setLeading(18)
 
-    for line in risk_text.split(". "):
-        text.textLine(line.strip())
+    for line in wrapped:
+        text.textLine(line)
 
     p.drawText(text)
 
-    y -= 85
+    y -= (len(wrapped) * 18) + 40
 
-    # ==========================================
-    # SIMILAR PATENTS SECTION
-    # ==========================================
+    # =========================================================
+    # SIMILAR PATENTS
+    # =========================================================
+    p.setFillColor(DARK)
     p.setFont("Helvetica-Bold", 16)
     p.drawString(50, y, "Similar Patent References")
 
@@ -362,19 +397,27 @@ y -= (len(wrapped) * 18)
         p.drawCentredString(475, y - 18, patent["match"] + " Match")
 
         # summary
-        p.setFillColor(DARK)
-        p.setFont("Helvetica", 10)
+        wrapped = simpleSplit(
+            patent["summary"],
+            "Helvetica",
+            10,
+            340
+        )
 
         text = p.beginText(65, y - 40)
-        text.setLeading(15)
-        text.textLine(patent["summary"])
+        text.setFont("Helvetica", 10)
+        text.setLeading(14)
+
+        for line in wrapped:
+            text.textLine(line)
+
         p.drawText(text)
 
         y -= 90
 
-    # ==========================================
-    # RECOMMENDATIONS
-    # ==========================================
+    # =========================================================
+    # NEXT STEPS
+    # =========================================================
     p.setFillColor(DARK)
     p.setFont("Helvetica-Bold", 16)
     p.drawString(50, y, "Recommended Next Steps")
@@ -382,29 +425,33 @@ y -= (len(wrapped) * 18)
     y -= 30
 
     recommendations = [
-    "Conduct a deeper patent search using Google Patents or a registered patent attorney",
-    "Review claim wording within similar existing patents",
-    "Document invention improvements and unique variations",
-    "Consider provisional patent protection before public disclosure"
-]
+        "Conduct a deeper patent search using Google Patents or a registered patent attorney",
+        "Review claim wording within similar existing patents",
+        "Document invention improvements and unique variations",
+        "Consider provisional patent protection before public disclosure"
+    ]
+
     p.setFont("Helvetica", 11)
 
     for item in recommendations:
-        p.drawString(65, y, f"• {item}")
-        y -= 22
 
-    # ==========================================
+        wrapped = simpleSplit(item, "Helvetica", 11, 450)
+
+        for line in wrapped:
+            p.drawString(65, y, f"• {line}")
+            y -= 18
+
+        y -= 6
+
+    # =========================================================
     # DISCLAIMER
-    # ==========================================
-    y -= 20
+    # =========================================================
+    y -= 10
 
     p.setStrokeColor(LIGHT)
     p.line(50, y, 545, y)
 
     y -= 25
-
-    p.setFont("Helvetica", 8)
-    p.setFillColor(HexColor("#6b7280"))
 
     disclaimer = (
         "This report is generated using AI-assisted patent similarity analysis "
@@ -412,17 +459,21 @@ y -= (len(wrapped) * 18)
         "PatentHound does not provide legal advice or guarantee patentability."
     )
 
+    wrapped = simpleSplit(disclaimer, "Helvetica", 8, 470)
+
     text = p.beginText(50, y)
+    text.setFont("Helvetica", 8)
+    text.setFillColor(GREY)
     text.setLeading(12)
 
-    for line in disclaimer.split(". "):
-        text.textLine(line.strip())
+    for line in wrapped:
+        text.textLine(line)
 
     p.drawText(text)
 
-    # ==========================================
-    # FINALISE PDF
-    # ==========================================
+    # =========================================================
+    # SAVE PDF
+    # =========================================================
     p.save()
 
     buffer.seek(0)

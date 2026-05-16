@@ -406,12 +406,16 @@ def download_pdf(query: str, session_id: str = None):
             340
         )
 
-        text = p.beginText(65, y - 40)
+       text = p.beginText(65, y - 40)
+
+        # force dark readable text
+        text.setFillColor(DARK)
+
         text.setFont("Helvetica", 10)
         text.setLeading(14)
 
         for line in wrapped_summary:
-            text.textLine(line)
+        text.textLine(line)
 
         p.drawText(text)
 

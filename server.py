@@ -60,17 +60,15 @@ def analyze(query: str, session_id: str = None):
     # -----------------------------------------------------
     novelty = random.randint(52, 91)
 
-    risk_options = [
+    risk = random.choice([
         "Low",
         "Medium",
         "Medium",
         "High"
-    ]
-
-    risk = random.choice(risk_options)
+    ])
 
     # -----------------------------------------------------
-    # SMART PATENT GENERATION
+    # CATEGORY PATENT TERMS
     # -----------------------------------------------------
     category_terms = {
 
@@ -80,6 +78,30 @@ def analyze(query: str, session_id: str = None):
             "Ergonomic Traction Support Device",
             "Smart Impact Absorption Layer",
             "Adjustable Foot Stabilization Mechanism"
+        ],
+
+        "golf": [
+            "Swing Analysis Training System",
+            "Golf Motion Tracking Device",
+            "Adaptive Putting Alignment Mechanism",
+            "Club Performance Monitoring Assembly",
+            "Smart Golf Training Platform"
+        ],
+
+        "training": [
+            "Interactive Skill Development System",
+            "Performance Tracking Mechanism",
+            "Adaptive Coaching Assistance Device",
+            "Precision Motion Monitoring Platform",
+            "Real-Time Technique Analysis Structure"
+        ],
+
+        "fitness": [
+            "Exercise Motion Detection System",
+            "Adaptive Resistance Training Device",
+            "Workout Performance Monitoring Platform",
+            "Smart Athletic Training Mechanism",
+            "Biomechanical Movement Analysis Assembly"
         ],
 
         "bicycle": [
@@ -136,28 +158,35 @@ def analyze(query: str, session_id: str = None):
             "Patient Monitoring Interface",
             "Medical Safety Detection Platform",
             "Adaptive Treatment Control Assembly"
+        ],
+
+        "sport": [
+            "Athletic Performance Monitoring Device",
+            "Dynamic Motion Analysis Platform",
+            "Sports Training Feedback System",
+            "Player Movement Tracking Mechanism",
+            "Competitive Skill Assessment Assembly"
         ]
     }
 
+    # -----------------------------------------------------
+    # DEFAULT TERMS
+    # -----------------------------------------------------
     default_terms = [
 
         "Adaptive Control Mechanism",
-
         "Integrated Monitoring Platform",
-
         "Automated Response Structure",
-
         "Dynamic Safety Assembly",
-
         "Smart Operational Device",
-
         "Intelligent Detection Mechanism",
-
         "Modular Control Interface",
-
         "Automated Stability Platform"
     ]
 
+    # -----------------------------------------------------
+    # SUMMARIES
+    # -----------------------------------------------------
     summaries = [
 
         "Potential overlap identified in functional operation and structural implementation.",
@@ -182,17 +211,17 @@ def analyze(query: str, session_id: str = None):
 
     for word in query_words:
 
-    if word in category_terms:
+        if word in category_terms:
 
-        selected_titles.extend(category_terms[word])
+            selected_titles.extend(category_terms[word])
 
     # remove duplicates
     selected_titles = list(set(selected_titles))
 
-    # fallback if nothing matched
+    # fallback
     if not selected_titles:
 
-    selected_titles = default_terms
+        selected_titles = default_terms
 
     # -----------------------------------------------------
     # GENERATE RESULTS
@@ -324,6 +353,7 @@ async def stripe_webhook(request: Request):
 def verify_payment(session_id: str):
 
     if session_id in paid_sessions:
+
         return {"paid": True}
 
     return {"paid": False}
@@ -335,6 +365,7 @@ def verify_payment(session_id: str):
 def download_pdf(query: str, session_id: str = None):
 
     if session_id not in paid_sessions:
+
         return {"error": "Payment required"}
 
     buffer = BytesIO()
@@ -355,16 +386,24 @@ def download_pdf(query: str, session_id: str = None):
 
     novelty = random.randint(52, 91)
 
-    risk = random.choice(["Low", "Medium", "Medium", "High"])
+    risk = random.choice([
+        "Low",
+        "Medium",
+        "Medium",
+        "High"
+    ])
 
     # HEADER
     p.setFillColor(DARK)
+
     p.setFont("Helvetica-Bold", 24)
+
     p.drawString(50, y, "PatentHound™")
 
     y -= 30
 
     p.setFont("Helvetica", 12)
+
     p.drawString(50, y, "AI Patent Insight Report")
 
     y -= 20
@@ -384,14 +423,18 @@ def download_pdf(query: str, session_id: str = None):
     y -= 25
 
     p.setStrokeColor(BLUE)
+
     p.setLineWidth(2)
+
     p.line(50, y, 545, y)
 
     # EXECUTIVE SUMMARY
     y -= 45
 
     p.setFillColor(DARK)
+
     p.setFont("Helvetica-Bold", 16)
+
     p.drawString(50, y, "Executive Summary")
 
     y -= 30
@@ -412,10 +455,13 @@ def download_pdf(query: str, session_id: str = None):
     text = p.beginText(50, y)
 
     text.setFillColor(DARK)
+
     text.setFont("Helvetica", 11)
+
     text.setLeading(20)
 
     for line in wrapped_summary:
+
         text.textLine(line)
 
     p.drawText(text)
@@ -424,7 +470,9 @@ def download_pdf(query: str, session_id: str = None):
 
     # NOVELTY
     p.setFillColor(DARK)
+
     p.setFont("Helvetica-Bold", 16)
+
     p.drawString(50, y, "Novelty Score")
 
     y -= 30
@@ -433,37 +481,48 @@ def download_pdf(query: str, session_id: str = None):
     novelty_label = "Highly Unique"
 
     if novelty < 70:
+
         novelty_colour = ORANGE
         novelty_label = "Moderately Unique"
 
     if novelty < 40:
+
         novelty_colour = RED
         novelty_label = "Low Uniqueness"
 
     p.setFillColor(LIGHT)
+
     p.roundRect(50, y, 400, 20, 6, fill=1, stroke=0)
 
     p.setFillColor(novelty_colour)
+
     p.roundRect(50, y, novelty * 4, 20, 6, fill=1, stroke=0)
 
     p.setFillColor(DARK)
+
     p.setFont("Helvetica-Bold", 12)
+
     p.drawString(465, y + 5, f"{novelty}/100")
 
     y -= 35
 
     p.setFillColor(novelty_colour)
+
     p.roundRect(50, y, 140, 24, 10, fill=1, stroke=0)
 
     p.setFillColorRGB(1, 1, 1)
+
     p.setFont("Helvetica-Bold", 10)
+
     p.drawCentredString(120, y + 8, novelty_label)
 
     # RISK
     y -= 55
 
     p.setFillColor(DARK)
+
     p.setFont("Helvetica-Bold", 16)
+
     p.drawString(50, y, "Patent Risk")
 
     y -= 30
@@ -471,16 +530,21 @@ def download_pdf(query: str, session_id: str = None):
     risk_colour = ORANGE
 
     if risk == "Low":
+
         risk_colour = GREEN
 
     if risk == "High":
+
         risk_colour = RED
 
     p.setFillColor(risk_colour)
+
     p.roundRect(50, y, 120, 24, 10, fill=1, stroke=0)
 
     p.setFillColorRGB(1, 1, 1)
+
     p.setFont("Helvetica-Bold", 11)
+
     p.drawCentredString(110, y + 8, f"{risk} Risk")
 
     y -= 40
@@ -500,10 +564,13 @@ def download_pdf(query: str, session_id: str = None):
     text = p.beginText(50, y)
 
     text.setFillColor(DARK)
+
     text.setFont("Helvetica", 11)
+
     text.setLeading(18)
 
     for line in wrapped_risk:
+
         text.textLine(line)
 
     p.drawText(text)
@@ -512,7 +579,9 @@ def download_pdf(query: str, session_id: str = None):
 
     # SIMILAR PATENTS
     p.setFillColor(DARK)
+
     p.setFont("Helvetica-Bold", 16)
+
     p.drawString(50, y, "Similar Patent References")
 
     y -= 30
@@ -577,6 +646,7 @@ def download_pdf(query: str, session_id: str = None):
         text.setLeading(14)
 
         for line in wrapped_summary:
+
             text.textLine(line)
 
         p.drawText(text)
@@ -585,7 +655,9 @@ def download_pdf(query: str, session_id: str = None):
 
     # NEXT STEPS
     p.setFillColor(DARK)
+
     p.setFont("Helvetica-Bold", 16)
+
     p.drawString(50, y, "Recommended Next Steps")
 
     y -= 30
@@ -598,6 +670,7 @@ def download_pdf(query: str, session_id: str = None):
     ]
 
     p.setFillColor(DARK)
+
     p.setFont("Helvetica", 11)
 
     for item in recommendations:
@@ -621,6 +694,7 @@ def download_pdf(query: str, session_id: str = None):
     y -= 10
 
     p.setStrokeColor(LIGHT)
+
     p.line(50, y, 545, y)
 
     y -= 25
@@ -641,10 +715,13 @@ def download_pdf(query: str, session_id: str = None):
     text = p.beginText(50, y)
 
     text.setFillColor(GREY)
+
     text.setFont("Helvetica", 8)
+
     text.setLeading(12)
 
     for line in wrapped_disclaimer:
+
         text.textLine(line)
 
     p.drawText(text)

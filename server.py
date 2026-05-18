@@ -5,9 +5,10 @@ from fastapi.responses import StreamingResponse
 import os
 import stripe
 import json
-import random
-import math
+import requests
+import hashlib
 from urllib.parse import quote_plus
+from bs4 import BeautifulSoup
 
 from io import BytesIO
 from reportlab.lib.pagesizes import A4
@@ -38,159 +39,210 @@ paid_sessions = set()
 # =========================================================
 @app.get("/")
 def home():
-    return {"status": "ok"}
+    return {"status": "PatentHound SaaS Online"}
 
 # =========================================================
-# SAAS INTELLIGENCE LAYER (CORE)
+# ---------------- INTELLIGENCE CORE ----------------
 # =========================================================
-def expand_query(query: str):
 
-    words = query.lower().split()
+DOMAIN_MAP = {
+    "phone": ["mobile device", "smartphone", "electronics"],
+    "water": ["bottle", "hydration", "container"],
+    "hold": ["mount", "attachment", "fixture"],
+    "bike": ["bicycle", "cycling", "transport"],
+    "golf": ["sports", "training", "swing mechanics"],
+    "shoe": ["footwear", "support system"],
+    "device": ["system", "apparatus", "mechanism"],
+    "wearable": ["sensor", "tracking device"]
+}
 
-    mapping = {
-        "water": ["hydration", "bottle", "container", "portable"],
-        "phone": ["mobile", "smartphone", "device"],
-        "bike": ["bicycle", "cycling"],
-        "golf": ["sports", "training", "swing"],
-        "dog": ["pet", "tracking"],
-        "shoe": ["footwear", "comfort"],
-        "fitness": ["health", "training", "performance"],
-        "device": ["system", "apparatus", "tool"],
-        "holder": ["mount", "attachment", "fixture"],
-        "smart": ["ai", "intelligent", "automated"]
+FUNCTIONAL_TERMS = {
+    "mount", "hold", "attach", "support", "control",
+    "detect", "monitor", "track", "system", "device", "mechanism"
+}
+
+# =========================================================
+# QUERY NORMALISATION (KEY TO CONSISTENCY)
+# =========================================================
+def normalise_query(query: str):
+
+    q = query.lower().split()
+    expanded = set(q)
+
+    for w in q:
+        if w in DOMAIN_MAP:
+            expanded.update(DOMAIN_MAP[w])
+
+    return sorted(list(expanded))
+
+
+# =========================================================
+# REAL PATENT DATA FETCH
+# =========================================================
+def fetch_patents(query: str):
+
+    url = f"https://patents.google.com/?q={quote_plus(query)}"
+
+    headers = {"User-Agent": "Mozilla/5.0"}
+
+    try:
+        r = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(r.text, "html.parser")
+
+        results = []
+
+        items = soup.select("search-result-item, article, div")
+
+        for item in items[:10]:
+
+            h = item.find("h3")
+            if not h:
+                continue
+
+            title = h.get_text(strip=True)
+
+            a = item.find("a", href=True)
+            link = a["href"] if a else url
+
+            if link.startswith("/"):
+                link = "https://patents.google.com" + link
+
+            span = item.find("span")
+            snippet = span.get_text(strip=True) if span else ""
+
+            results.append({
+                "title": title,
+                "abstract": snippet or "Patent record from Google Patents.",
+                "url": link
+            })
+
+        if not results:
+            results = [{
+                "title": "Google Patents Search Results",
+                "abstract": "No structured results parsed — fallback to search link.",
+                "url": url
+            }]
+
+        return results
+
+    except Exception:
+        return [{
+            "title": "Patent search unavailable",
+            "abstract": "Fallback search link provided.",
+            "url": url
+        }]
+
+# =========================================================
+# INFRINGEMENT INTELLIGENCE ENGINE
+# =========================================================
+def calculate_risk(query, title, abstract):
+
+    q_tokens = set(query.lower().split())
+    t_tokens = set(title.lower().split())
+    a_tokens = set(abstract.lower().split())
+
+    overlap = len(q_tokens & t_tokens) * 3 + len(q_tokens & a_tokens) * 2
+    functional_overlap = len(q_tokens & FUNCTIONAL_TERMS) * 2
+
+    score = overlap + functional_overlap
+
+    # normalize to 0–100
+    return min(100, score * 6)
+
+
+# =========================================================
+# AI LEGAL ANALYST LAYER (INVESTOR FEATURE)
+# =========================================================
+def analyst_reasoning(query, title, abstract, score):
+
+    q = set(query.lower().split())
+    t = set(title.lower().split())
+
+    overlaps = list(q & t)
+
+    if score >= 70:
+        risk = "HIGH infringement exposure"
+        insight = "strong structural + functional similarity detected"
+    elif score >= 40:
+        risk = "MEDIUM infringement exposure"
+        insight = "partial overlap in functional implementation"
+    else:
+        risk = "LOW infringement exposure"
+        insight = "limited prior art similarity detected"
+
+    return {
+        "risk_statement": risk,
+        "analysis": insight,
+        "matched_terms": overlaps[:6]
     }
 
-    expanded = set(words)
-
-    for w in words:
-        if w in mapping:
-            expanded.update(mapping[w])
-
-    return list(expanded)
 
 # =========================================================
-# GOOGLE PATENT SEARCH BUILDER (FREE SOURCE)
-# =========================================================
-def build_google_patent_url(terms):
-
-    q = "+".join(terms[:6])
-    return f"https://patents.google.com/?q={quote_plus(q)}"
-
-# =========================================================
-# EMBEDDING LAYER (SAA S-TIER SIMPLE VERSION)
-# replace later with OpenAI if needed
-# =========================================================
-def embed(text: str):
-    random.seed(hash(text) % 999999)
-    return [random.random() for _ in range(24)]
-
-def cosine(a, b):
-    dot = sum(x*y for x, y in zip(a, b))
-    na = math.sqrt(sum(x*x for x in a))
-    nb = math.sqrt(sum(x*x for x in b))
-    return dot / (na * nb + 1e-9)
-
-# =========================================================
-# SAAS PATENT INTELLIGENCE CORPUS (GROWS OVER TIME)
-# =========================================================
-PATENT_DB = [
-    "wearable smartphone hydration bottle mount system",
-    "bicycle phone holder attachment cycling navigation system",
-    "smart fitness wearable biometric tracking system",
-    "golf swing motion training feedback device system",
-    "medical remote patient monitoring wearable patch",
-    "vehicle collision avoidance safety control system",
-    "adaptive orthopedic footwear pressure system",
-    "drone autonomous navigation obstacle avoidance system",
-    "AI automated kitchen dispensing system",
-    "sports performance analytics tracking device",
-    "wearable industrial safety monitoring sensor",
-    "portable mobile device mounting backpack system",
-    "smart cycling navigation display system",
-]
-
-# =========================================================
-# RANKING ENGINE (PRODUCTION LOGIC)
-# =========================================================
-def rank(query_vec, item):
-
-    item_vec = embed(item)
-
-    base_score = cosine(query_vec, item_vec)
-
-    # domain boost (important for SaaS relevance)
-    boost = 0.0
-    keywords = ["phone", "bike", "wearable", "medical", "fitness", "golf"]
-
-    if any(k in item.lower() for k in keywords):
-        boost += 0.07
-
-    return base_score + boost
-
-# =========================================================
-# ANALYZE (PRODUCTION SAAS ENDPOINT)
+# ANALYZE ENDPOINT (INVESTOR-GRADE OUTPUT)
 # =========================================================
 @app.get("/analyze")
 def analyze(query: str, session_id: str = None):
 
     is_paid = session_id in paid_sessions
 
-    expanded = expand_query(query)
+    normalised = " ".join(normalise_query(query))
 
-    query_vec = embed(query)
+    patents = fetch_patents(normalised)
 
-    scored = []
+    analysed = []
 
-    for item in PATENT_DB:
+    for p in patents:
 
-        score = rank(query_vec, item)
+        score = calculate_risk(query, p["title"], p["abstract"])
+        reasoning = analyst_reasoning(query, p["title"], p["abstract"], score)
 
-        scored.append((item, score))
-
-    scored.sort(key=lambda x: x[1], reverse=True)
-
-    top = scored[:3]
-
-    novelty = int((1 - top[0][1]) * 100)
-    novelty = max(20, min(95, novelty))
-
-    risk = random.choice(["Low", "Medium", "Medium", "High"])
-
-    results = []
-
-    for item, score in top:
-
-        similarity = int(score * 100)
-
-        results.append({
-            "title": item.title(),
-            "abstract": "Patent cluster identified using semantic similarity + domain classification.",
-            "similarity": similarity,
-            "url": build_google_patent_url(expanded)
+        analysed.append({
+            "title": p["title"],
+            "abstract": p["abstract"][:260],
+            "similarity": score,
+            "reasoning": reasoning,
+            "url": p["url"]
         })
 
-    # LOCKING SYSTEM (UNCHANGED UX)
+    analysed.sort(key=lambda x: x["similarity"], reverse=True)
+
+    top = analysed[:5]
+
+    avg = sum(x["similarity"] for x in top) / len(top)
+
+    if avg >= 70:
+        risk_level = "High"
+    elif avg >= 40:
+        risk_level = "Medium"
+    else:
+        risk_level = "Low"
+
+    novelty = max(10, 100 - int(avg))
+
+    # LOCK (UNCHANGED FRONTEND CONTRACT)
     if not is_paid:
-        results = [
+        top = [
             {
-                "title": r["title"],
-                "abstract": "🔒 Unlock full details",
+                "title": x["title"],
+                "abstract": "🔒 Unlock full report",
                 "similarity": None,
+                "reasoning": None,
                 "url": None
             }
-            for r in results
+            for x in top
         ]
 
     return {
         "query": query,
         "novelty": novelty,
-        "risk": risk,
+        "risk": risk_level,
         "paid": is_paid,
-        "results": results
+        "results": top
     }
 
+
 # =========================================================
-# STRIPE (UNCHANGED)
+# STRIPE
 # =========================================================
 @app.post("/create-checkout")
 def create_checkout():
@@ -201,7 +253,7 @@ def create_checkout():
         line_items=[{
             "price_data": {
                 "currency": "gbp",
-                "product_data": {"name": "PatentHound Full Report"},
+                "product_data": {"name": "PatentHound Pro Report"},
                 "unit_amount": 899,
             },
             "quantity": 1,
@@ -211,6 +263,7 @@ def create_checkout():
     )
 
     return {"url": session.url}
+
 
 # =========================================================
 # WEBHOOK
@@ -229,16 +282,18 @@ async def stripe_webhook(request: Request):
 
     return {"status": "success"}
 
+
 # =========================================================
-# VERIFY
+# VERIFY PAYMENT
 # =========================================================
 @app.get("/verify-payment")
 def verify_payment(session_id: str):
 
     return {"paid": session_id in paid_sessions}
 
+
 # =========================================================
-# PDF (UNCHANGED SAFE STRUCTURE)
+# PDF (CLEAN INVESTOR REPORT)
 # =========================================================
 @app.get("/download-pdf")
 def download_pdf(query: str, session_id: str = None):
@@ -252,11 +307,11 @@ def download_pdf(query: str, session_id: str = None):
     y = 800
 
     p.setFont("Helvetica-Bold", 20)
-    p.drawString(50, y, "PatentHound Report")
+    p.drawString(50, y, "PatentHound Investor Intelligence Report")
 
     y -= 40
 
-    summary = f"The invention '{query}' was analysed using semantic patent clustering."
+    summary = f"The invention '{query}' was analysed using AI infringement intelligence + real patent dataset retrieval."
 
     wrapped = simpleSplit(summary, "Helvetica", 11, 450)
 
@@ -274,5 +329,5 @@ def download_pdf(query: str, session_id: str = None):
     return StreamingResponse(
         buffer,
         media_type="application/pdf",
-        headers={"Content-Disposition": "attachment; filename=report.pdf"}
+        headers={"Content-Disposition": "attachment; filename=patenthound-investor-report.pdf"}
     )

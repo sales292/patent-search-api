@@ -55,12 +55,6 @@ def analyze(query: str, session_id: str = None):
     # -----------------------------------------------------
     clean_query = query.strip().lower()
 
-    words = clean_query.split()
-
-    primary = words[0] if len(words) > 0 else "smart"
-
-    secondary = words[1] if len(words) > 1 else "system"
-
     # -----------------------------------------------------
     # DYNAMIC SCORES
     # -----------------------------------------------------
@@ -76,29 +70,126 @@ def analyze(query: str, session_id: str = None):
     risk = random.choice(risk_options)
 
     # -----------------------------------------------------
-    # DYNAMIC PATENT TERMS
+    # SMART PATENT GENERATION
     # -----------------------------------------------------
-    endings = [
-        "control system",
-        "monitoring assembly",
-        "automation device",
-        "detection mechanism",
-        "safety structure",
-        "modular apparatus",
-        "integrated platform",
-        "management system",
-        "adaptive mechanism",
-        "operational assembly"
+    category_terms = {
+
+        "shoe": [
+            "Adaptive Footwear Cushioning Structure",
+            "Dynamic Sole Pressure System",
+            "Ergonomic Traction Support Device",
+            "Smart Impact Absorption Layer",
+            "Adjustable Foot Stabilization Mechanism"
+        ],
+
+        "bicycle": [
+            "Hydraulic Brake Pressure Control System",
+            "Adaptive Rotor Monitoring Assembly",
+            "Emergency Braking Stabilization Device",
+            "Smart Cycling Safety Mechanism",
+            "Dynamic Brake Response Structure"
+        ],
+
+        "bike": [
+            "Hydraulic Brake Pressure Control System",
+            "Adaptive Rotor Monitoring Assembly",
+            "Emergency Braking Stabilization Device",
+            "Smart Cycling Safety Mechanism",
+            "Dynamic Brake Response Structure"
+        ],
+
+        "drone": [
+            "Autonomous Flight Stabilization System",
+            "Aerial Navigation Monitoring Device",
+            "Remote Altitude Control Mechanism",
+            "Obstacle Detection Flight Platform",
+            "Smart Propulsion Adjustment Assembly"
+        ],
+
+        "dog": [
+            "Wearable Animal Tracking Device",
+            "GPS Monitoring Collar System",
+            "Remote Behaviour Alert Mechanism",
+            "Pet Activity Monitoring Platform",
+            "Wireless Safety Tracking Assembly"
+        ],
+
+        "kitchen": [
+            "Automated Food Preparation System",
+            "Temperature Controlled Cooking Device",
+            "Smart Ingredient Dispensing Platform",
+            "Adaptive Kitchen Monitoring Structure",
+            "Integrated Appliance Safety Mechanism"
+        ],
+
+        "phone": [
+            "Wireless Communication Enhancement Device",
+            "Adaptive Mobile Interface System",
+            "Battery Optimization Structure",
+            "Smart Signal Processing Platform",
+            "Integrated User Interaction Mechanism"
+        ],
+
+        "medical": [
+            "Remote Health Monitoring Device",
+            "Automated Diagnostic Assistance System",
+            "Patient Monitoring Interface",
+            "Medical Safety Detection Platform",
+            "Adaptive Treatment Control Assembly"
+        ]
+    }
+
+    default_terms = [
+
+        "Adaptive Control Mechanism",
+
+        "Integrated Monitoring Platform",
+
+        "Automated Response Structure",
+
+        "Dynamic Safety Assembly",
+
+        "Smart Operational Device",
+
+        "Intelligent Detection Mechanism",
+
+        "Modular Control Interface",
+
+        "Automated Stability Platform"
     ]
 
     summaries = [
-        "Potential overlap identified in functional operation and core structural design.",
-        "Related concepts detected within similar technical implementation areas.",
+
+        "Potential overlap identified in functional operation and structural implementation.",
+
+        "Related concepts detected within similar technical application categories.",
+
         "Comparable invention behaviour identified in partially overlapping systems.",
+
         "Several similarities detected in mechanism arrangement and component interaction.",
+
         "Functional overlap may exist in automation and operational methodology.",
-        "Related structural concepts identified in comparable invention categories."
+
+        "Related structural concepts identified in comparable invention sectors."
     ]
+
+    # -----------------------------------------------------
+    # DETECT CATEGORY
+    # -----------------------------------------------------
+    selected_titles = []
+
+    for keyword, titles in category_terms.items():
+
+        if keyword in clean_query:
+
+            selected_titles = titles
+
+            break
+
+    # fallback
+    if not selected_titles:
+
+        selected_titles = default_terms
 
     # -----------------------------------------------------
     # GENERATE RESULTS
@@ -109,15 +200,11 @@ def analyze(query: str, session_id: str = None):
 
     for i in range(3):
 
-        ending = random.choice(endings)
-
-        title = f"{primary} {secondary} {ending}"
+        title = random.choice(selected_titles)
 
         while title in used_titles:
 
-            ending = random.choice(endings)
-
-            title = f"{primary} {secondary} {ending}"
+            title = random.choice(selected_titles)
 
         used_titles.add(title)
 
@@ -127,11 +214,11 @@ def analyze(query: str, session_id: str = None):
 
         patent_url = (
             f"https://patents.google.com/?q="
-            f"{query.replace(' ', '+')}+{ending.replace(' ', '+')}"
+            f"{query.replace(' ', '+')}+{title.replace(' ', '+')}"
         )
 
         results.append({
-            "title": title.title(),
+            "title": title,
             "abstract": summary,
             "similarity": similarity,
             "url": patent_url
@@ -255,9 +342,6 @@ def download_pdf(query: str, session_id: str = None):
 
     y = height - 60
 
-    # =====================================================
-    # COLOURS
-    # =====================================================
     GREEN = HexColor("#22c55e")
     ORANGE = HexColor("#f59e0b")
     RED = HexColor("#ef4444")
@@ -268,28 +352,16 @@ def download_pdf(query: str, session_id: str = None):
 
     novelty = random.randint(52, 91)
 
-    risk_options = [
-        "Low",
-        "Medium",
-        "Medium",
-        "High"
-    ]
+    risk = random.choice(["Low", "Medium", "Medium", "High"])
 
-    risk = random.choice(risk_options)
-
-    # =====================================================
     # HEADER
-    # =====================================================
     p.setFillColor(DARK)
-
     p.setFont("Helvetica-Bold", 24)
-
     p.drawString(50, y, "PatentHound™")
 
     y -= 30
 
     p.setFont("Helvetica", 12)
-
     p.drawString(50, y, "AI Patent Insight Report")
 
     y -= 20
@@ -309,20 +381,14 @@ def download_pdf(query: str, session_id: str = None):
     y -= 25
 
     p.setStrokeColor(BLUE)
-
     p.setLineWidth(2)
-
     p.line(50, y, 545, y)
 
-    # =====================================================
     # EXECUTIVE SUMMARY
-    # =====================================================
     y -= 45
 
     p.setFillColor(DARK)
-
     p.setFont("Helvetica-Bold", 16)
-
     p.drawString(50, y, "Executive Summary")
 
     y -= 30
@@ -343,26 +409,19 @@ def download_pdf(query: str, session_id: str = None):
     text = p.beginText(50, y)
 
     text.setFillColor(DARK)
-
     text.setFont("Helvetica", 11)
-
     text.setLeading(20)
 
     for line in wrapped_summary:
-
         text.textLine(line)
 
     p.drawText(text)
 
     y -= (len(wrapped_summary) * 20) + 55
 
-    # =====================================================
-    # NOVELTY SCORE
-    # =====================================================
+    # NOVELTY
     p.setFillColor(DARK)
-
     p.setFont("Helvetica-Bold", 16)
-
     p.drawString(50, y, "Novelty Score")
 
     y -= 30
@@ -379,40 +438,29 @@ def download_pdf(query: str, session_id: str = None):
         novelty_label = "Low Uniqueness"
 
     p.setFillColor(LIGHT)
-
     p.roundRect(50, y, 400, 20, 6, fill=1, stroke=0)
 
     p.setFillColor(novelty_colour)
-
     p.roundRect(50, y, novelty * 4, 20, 6, fill=1, stroke=0)
 
     p.setFillColor(DARK)
-
     p.setFont("Helvetica-Bold", 12)
-
     p.drawString(465, y + 5, f"{novelty}/100")
 
     y -= 35
 
     p.setFillColor(novelty_colour)
-
     p.roundRect(50, y, 140, 24, 10, fill=1, stroke=0)
 
     p.setFillColorRGB(1, 1, 1)
-
     p.setFont("Helvetica-Bold", 10)
-
     p.drawCentredString(120, y + 8, novelty_label)
 
-    # =====================================================
-    # RISK SECTION
-    # =====================================================
+    # RISK
     y -= 55
 
     p.setFillColor(DARK)
-
     p.setFont("Helvetica-Bold", 16)
-
     p.drawString(50, y, "Patent Risk")
 
     y -= 30
@@ -426,13 +474,10 @@ def download_pdf(query: str, session_id: str = None):
         risk_colour = RED
 
     p.setFillColor(risk_colour)
-
     p.roundRect(50, y, 120, 24, 10, fill=1, stroke=0)
 
     p.setFillColorRGB(1, 1, 1)
-
     p.setFont("Helvetica-Bold", 11)
-
     p.drawCentredString(110, y + 8, f"{risk} Risk")
 
     y -= 40
@@ -452,26 +497,19 @@ def download_pdf(query: str, session_id: str = None):
     text = p.beginText(50, y)
 
     text.setFillColor(DARK)
-
     text.setFont("Helvetica", 11)
-
     text.setLeading(18)
 
     for line in wrapped_risk:
-
         text.textLine(line)
 
     p.drawText(text)
 
     y -= (len(wrapped_risk) * 18) + 40
 
-    # =====================================================
     # SIMILAR PATENTS
-    # =====================================================
     p.setFillColor(DARK)
-
     p.setFont("Helvetica-Bold", 16)
-
     p.drawString(50, y, "Similar Patent References")
 
     y -= 30
@@ -536,20 +574,15 @@ def download_pdf(query: str, session_id: str = None):
         text.setLeading(14)
 
         for line in wrapped_summary:
-
             text.textLine(line)
 
         p.drawText(text)
 
         y -= 90
 
-    # =====================================================
     # NEXT STEPS
-    # =====================================================
     p.setFillColor(DARK)
-
     p.setFont("Helvetica-Bold", 16)
-
     p.drawString(50, y, "Recommended Next Steps")
 
     y -= 30
@@ -562,7 +595,6 @@ def download_pdf(query: str, session_id: str = None):
     ]
 
     p.setFillColor(DARK)
-
     p.setFont("Helvetica", 11)
 
     for item in recommendations:
@@ -582,13 +614,10 @@ def download_pdf(query: str, session_id: str = None):
 
         y -= 6
 
-    # =====================================================
     # DISCLAIMER
-    # =====================================================
     y -= 10
 
     p.setStrokeColor(LIGHT)
-
     p.line(50, y, 545, y)
 
     y -= 25
@@ -609,20 +638,14 @@ def download_pdf(query: str, session_id: str = None):
     text = p.beginText(50, y)
 
     text.setFillColor(GREY)
-
     text.setFont("Helvetica", 8)
-
     text.setLeading(12)
 
     for line in wrapped_disclaimer:
-
         text.textLine(line)
 
     p.drawText(text)
 
-    # =====================================================
-    # SAVE PDF
-    # =====================================================
     p.save()
 
     buffer.seek(0)

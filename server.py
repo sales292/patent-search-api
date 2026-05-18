@@ -174,22 +174,25 @@ def analyze(query: str, session_id: str = None):
     ]
 
     # -----------------------------------------------------
-    # DETECT CATEGORY
+    # DETECT MULTIPLE KEYWORDS
     # -----------------------------------------------------
     selected_titles = []
 
-    for keyword, titles in category_terms.items():
+    query_words = clean_query.split()
 
-        if keyword in clean_query:
+    for word in query_words:
 
-            selected_titles = titles
+    if word in category_terms:
 
-            break
+        selected_titles.extend(category_terms[word])
 
-    # fallback
+    # remove duplicates
+    selected_titles = list(set(selected_titles))
+
+    # fallback if nothing matched
     if not selected_titles:
 
-        selected_titles = default_terms
+    selected_titles = default_terms
 
     # -----------------------------------------------------
     # GENERATE RESULTS

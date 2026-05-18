@@ -32,7 +32,6 @@ app.add_middleware(
 # =========================================================
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
-# temporary paid session storage
 paid_sessions = set()
 
 # =========================================================
@@ -50,14 +49,8 @@ def analyze(query: str, session_id: str = None):
 
     is_paid = session_id in paid_sessions
 
-    # -----------------------------------------------------
-    # CLEAN QUERY
-    # -----------------------------------------------------
     clean_query = query.strip().lower()
 
-    # -----------------------------------------------------
-    # DYNAMIC SCORES
-    # -----------------------------------------------------
     novelty = random.randint(52, 91)
 
     risk = random.choice([
@@ -67,18 +60,10 @@ def analyze(query: str, session_id: str = None):
         "High"
     ])
 
-    # -----------------------------------------------------
-    # CATEGORY PATENT TERMS
-    # -----------------------------------------------------
+    # =====================================================
+    # CATEGORY TERMS
+    # =====================================================
     category_terms = {
-
-        "shoe": [
-            "Adaptive Footwear Cushioning Structure",
-            "Dynamic Sole Pressure System",
-            "Ergonomic Traction Support Device",
-            "Smart Impact Absorption Layer",
-            "Adjustable Foot Stabilization Mechanism"
-        ],
 
         "golf": [
             "Swing Analysis Training System",
@@ -96,12 +81,12 @@ def analyze(query: str, session_id: str = None):
             "Real-Time Technique Analysis Structure"
         ],
 
-        "fitness": [
-            "Exercise Motion Detection System",
-            "Adaptive Resistance Training Device",
-            "Workout Performance Monitoring Platform",
-            "Smart Athletic Training Mechanism",
-            "Biomechanical Movement Analysis Assembly"
+        "shoe": [
+            "Adaptive Footwear Cushioning Structure",
+            "Dynamic Sole Pressure System",
+            "Ergonomic Traction Support Device",
+            "Smart Impact Absorption Layer",
+            "Adjustable Foot Stabilization Mechanism"
         ],
 
         "bicycle": [
@@ -144,14 +129,6 @@ def analyze(query: str, session_id: str = None):
             "Integrated Appliance Safety Mechanism"
         ],
 
-        "phone": [
-            "Wireless Communication Enhancement Device",
-            "Adaptive Mobile Interface System",
-            "Battery Optimization Structure",
-            "Smart Signal Processing Platform",
-            "Integrated User Interaction Mechanism"
-        ],
-
         "medical": [
             "Remote Health Monitoring Device",
             "Automated Diagnostic Assistance System",
@@ -160,33 +137,56 @@ def analyze(query: str, session_id: str = None):
             "Adaptive Treatment Control Assembly"
         ],
 
-        "sport": [
-            "Athletic Performance Monitoring Device",
-            "Dynamic Motion Analysis Platform",
-            "Sports Training Feedback System",
-            "Player Movement Tracking Mechanism",
-            "Competitive Skill Assessment Assembly"
+        "fitness": [
+            "Exercise Motion Detection System",
+            "Adaptive Resistance Training Device",
+            "Workout Performance Monitoring Platform",
+            "Smart Athletic Training Mechanism",
+            "Biomechanical Movement Analysis Assembly"
+        ],
+
+        "smart": [
+            "Intelligent Monitoring Platform",
+            "AI Assisted Detection System",
+            "Connected Sensor Interface",
+            "Adaptive Data Response Mechanism",
+            "Automated Smart Control Platform"
+        ],
+
+        "safety": [
+            "Emergency Detection Mechanism",
+            "Protective Monitoring Structure",
+            "Hazard Prevention System",
+            "Automated Alert Assembly",
+            "Dynamic Safety Response Platform"
         ]
     }
 
-    # -----------------------------------------------------
+    # =====================================================
     # DEFAULT TERMS
-    # -----------------------------------------------------
+    # =====================================================
     default_terms = [
 
-        "Adaptive Control Mechanism",
-        "Integrated Monitoring Platform",
-        "Automated Response Structure",
-        "Dynamic Safety Assembly",
-        "Smart Operational Device",
-        "Intelligent Detection Mechanism",
-        "Modular Control Interface",
-        "Automated Stability Platform"
+        "Adaptive Monitoring Platform",
+        "Integrated Safety Mechanism",
+        "Automated Control Structure",
+        "Dynamic Operational System",
+        "Smart Detection Assembly",
+        "Intelligent Response Platform",
+        "Precision Tracking Device",
+        "Wireless Monitoring Interface",
+        "Automated Stability Structure",
+        "Advanced Functional Mechanism",
+        "Intelligent Sensor Platform",
+        "Real-Time Adaptive System",
+        "Predictive Monitoring Assembly",
+        "Smart Control Device",
+        "Autonomous Operational Platform"
     ]
 
-    # -----------------------------------------------------
+    # =====================================================
     # SUMMARIES
-    # -----------------------------------------------------
+    # =====================================================
     summaries = [
 
         "Potential overlap identified in functional operation and structural implementation.",
@@ -202,9 +202,9 @@ def analyze(query: str, session_id: str = None):
         "Related structural concepts identified in comparable invention sectors."
     ]
 
-    # -----------------------------------------------------
-    # DETECT MULTIPLE KEYWORDS
-    # -----------------------------------------------------
+    # =====================================================
+    # DETECT ALL MATCHES
+    # =====================================================
     selected_titles = []
 
     query_words = clean_query.split()
@@ -215,30 +215,35 @@ def analyze(query: str, session_id: str = None):
 
             selected_titles.extend(category_terms[word])
 
-    # remove duplicates
-    selected_titles = list(set(selected_titles))
+    # =====================================================
+    # FALLBACK
+    # =====================================================
+    if len(selected_titles) < 3:
 
-    # fallback
-    if not selected_titles:
+        selected_titles.extend(default_terms)
 
-        selected_titles = default_terms
+    # =====================================================
+    # RANDOMISE RESULTS
+    # =====================================================
+    random.shuffle(selected_titles)
 
-    # -----------------------------------------------------
+    # =====================================================
     # GENERATE RESULTS
-    # -----------------------------------------------------
+    # =====================================================
     results = []
 
-    used_titles = set()
+    used_titles = []
 
     for i in range(3):
 
-        title = random.choice(selected_titles)
+        available_titles = [
+            t for t in selected_titles
+            if t not in used_titles
+        ]
 
-        while title in used_titles:
+        title = random.choice(available_titles)
 
-            title = random.choice(selected_titles)
-
-        used_titles.add(title)
+        used_titles.append(title)
 
         similarity = random.randint(22, 67)
 
@@ -256,9 +261,9 @@ def analyze(query: str, session_id: str = None):
             "url": patent_url
         })
 
-    # -----------------------------------------------------
+    # =====================================================
     # LOCK RESULTS IF UNPAID
-    # -----------------------------------------------------
+    # =====================================================
     if not is_paid:
 
         results = [
@@ -395,15 +400,12 @@ def download_pdf(query: str, session_id: str = None):
 
     # HEADER
     p.setFillColor(DARK)
-
     p.setFont("Helvetica-Bold", 24)
-
     p.drawString(50, y, "PatentHound™")
 
     y -= 30
 
     p.setFont("Helvetica", 12)
-
     p.drawString(50, y, "AI Patent Insight Report")
 
     y -= 20
@@ -411,7 +413,6 @@ def download_pdf(query: str, session_id: str = None):
     from datetime import datetime
 
     p.setFont("Helvetica", 10)
-
     p.drawString(50, y, f"Generated for: {query}")
 
     p.drawString(
@@ -423,18 +424,14 @@ def download_pdf(query: str, session_id: str = None):
     y -= 25
 
     p.setStrokeColor(BLUE)
-
     p.setLineWidth(2)
-
     p.line(50, y, 545, y)
 
     # EXECUTIVE SUMMARY
     y -= 45
 
     p.setFillColor(DARK)
-
     p.setFont("Helvetica-Bold", 16)
-
     p.drawString(50, y, "Executive Summary")
 
     y -= 30
@@ -455,13 +452,10 @@ def download_pdf(query: str, session_id: str = None):
     text = p.beginText(50, y)
 
     text.setFillColor(DARK)
-
     text.setFont("Helvetica", 11)
-
     text.setLeading(20)
 
     for line in wrapped_summary:
-
         text.textLine(line)
 
     p.drawText(text)
@@ -470,9 +464,7 @@ def download_pdf(query: str, session_id: str = None):
 
     # NOVELTY
     p.setFillColor(DARK)
-
     p.setFont("Helvetica-Bold", 16)
-
     p.drawString(50, y, "Novelty Score")
 
     y -= 30
@@ -481,48 +473,37 @@ def download_pdf(query: str, session_id: str = None):
     novelty_label = "Highly Unique"
 
     if novelty < 70:
-
         novelty_colour = ORANGE
         novelty_label = "Moderately Unique"
 
     if novelty < 40:
-
         novelty_colour = RED
         novelty_label = "Low Uniqueness"
 
     p.setFillColor(LIGHT)
-
     p.roundRect(50, y, 400, 20, 6, fill=1, stroke=0)
 
     p.setFillColor(novelty_colour)
-
     p.roundRect(50, y, novelty * 4, 20, 6, fill=1, stroke=0)
 
     p.setFillColor(DARK)
-
     p.setFont("Helvetica-Bold", 12)
-
     p.drawString(465, y + 5, f"{novelty}/100")
 
     y -= 35
 
     p.setFillColor(novelty_colour)
-
     p.roundRect(50, y, 140, 24, 10, fill=1, stroke=0)
 
     p.setFillColorRGB(1, 1, 1)
-
     p.setFont("Helvetica-Bold", 10)
-
     p.drawCentredString(120, y + 8, novelty_label)
 
     # RISK
     y -= 55
 
     p.setFillColor(DARK)
-
     p.setFont("Helvetica-Bold", 16)
-
     p.drawString(50, y, "Patent Risk")
 
     y -= 30
@@ -530,21 +511,16 @@ def download_pdf(query: str, session_id: str = None):
     risk_colour = ORANGE
 
     if risk == "Low":
-
         risk_colour = GREEN
 
     if risk == "High":
-
         risk_colour = RED
 
     p.setFillColor(risk_colour)
-
     p.roundRect(50, y, 120, 24, 10, fill=1, stroke=0)
 
     p.setFillColorRGB(1, 1, 1)
-
     p.setFont("Helvetica-Bold", 11)
-
     p.drawCentredString(110, y + 8, f"{risk} Risk")
 
     y -= 40
@@ -564,13 +540,10 @@ def download_pdf(query: str, session_id: str = None):
     text = p.beginText(50, y)
 
     text.setFillColor(DARK)
-
     text.setFont("Helvetica", 11)
-
     text.setLeading(18)
 
     for line in wrapped_risk:
-
         text.textLine(line)
 
     p.drawText(text)
@@ -579,23 +552,21 @@ def download_pdf(query: str, session_id: str = None):
 
     # SIMILAR PATENTS
     p.setFillColor(DARK)
-
     p.setFont("Helvetica-Bold", 16)
-
     p.drawString(50, y, "Similar Patent References")
 
     y -= 30
-
-    patent_titles = [
-        f"{query.title()} Adaptive Mechanism",
-        f"{query.title()} Monitoring Assembly",
-        f"{query.title()} Integrated Platform"
-    ]
 
     patent_summaries = [
         "Potential overlap identified in functional operation and core structural design.",
         "Related concepts detected within similar technical implementation areas.",
         "Comparable invention behaviour identified in partially overlapping systems."
+    ]
+
+    dynamic_titles = [
+        f"{query.title()} Smart Detection System",
+        f"{query.title()} Adaptive Monitoring Platform",
+        f"{query.title()} Integrated Safety Mechanism"
     ]
 
     for i in range(3):
@@ -607,21 +578,16 @@ def download_pdf(query: str, session_id: str = None):
             y = height - 60
 
         p.setFillColor(LIGHT)
-
         p.roundRect(50, y - 60, 495, 70, 8, fill=1, stroke=0)
 
         p.setFillColor(DARK)
-
         p.setFont("Helvetica-Bold", 12)
-
-        p.drawString(65, y - 20, patent_titles[i])
+        p.drawString(65, y - 20, dynamic_titles[i])
 
         p.setFillColor(BLUE)
-
         p.roundRect(430, y - 25, 90, 20, 8, fill=1, stroke=0)
 
         p.setFillColorRGB(1, 1, 1)
-
         p.setFont("Helvetica-Bold", 10)
 
         p.drawCentredString(
@@ -640,13 +606,10 @@ def download_pdf(query: str, session_id: str = None):
         text = p.beginText(65, y - 40)
 
         text.setFillColor(DARK)
-
         text.setFont("Helvetica", 10)
-
         text.setLeading(14)
 
         for line in wrapped_summary:
-
             text.textLine(line)
 
         p.drawText(text)
@@ -655,9 +618,7 @@ def download_pdf(query: str, session_id: str = None):
 
     # NEXT STEPS
     p.setFillColor(DARK)
-
     p.setFont("Helvetica-Bold", 16)
-
     p.drawString(50, y, "Recommended Next Steps")
 
     y -= 30
@@ -670,7 +631,6 @@ def download_pdf(query: str, session_id: str = None):
     ]
 
     p.setFillColor(DARK)
-
     p.setFont("Helvetica", 11)
 
     for item in recommendations:
@@ -694,7 +654,6 @@ def download_pdf(query: str, session_id: str = None):
     y -= 10
 
     p.setStrokeColor(LIGHT)
-
     p.line(50, y, 545, y)
 
     y -= 25
@@ -715,13 +674,10 @@ def download_pdf(query: str, session_id: str = None):
     text = p.beginText(50, y)
 
     text.setFillColor(GREY)
-
     text.setFont("Helvetica", 8)
-
     text.setLeading(12)
 
     for line in wrapped_disclaimer:
-
         text.textLine(line)
 
     p.drawText(text)
